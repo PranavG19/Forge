@@ -1,273 +1,255 @@
-# Implementation Guide for Monk Mode: Forge
-**Target Agent**: Claude 3.5-based coding agent  
-**Project**: Complete the React Native implementation of Monk Mode: Forge per the PRD  
-**Date**: April 11, 2025  
-**Goal**: Finalize MVP features within 6-9 weeks, focusing on missing functionality, UX fidelity, and analytics integration.
+Implementation Guide for Completing "Monk Mode: Forge"
+Introduction
+This guide provides a detailed, step-by-step plan for Cline to autonomously complete the "Monk Mode: Forge" app, a React Native project aimed at helping users in "Monk Mode" achieve extreme focus and discipline. The app includes features like intention-setting, a priority-based to-do list, a focus timer with app-blocking, and a profile/settings section. The current codebase contains basic screens and services, but many features specified in the PRD (version 1.0, dated April 11, 2025) are incomplete or missing.
 
----
+Purpose: This guide ensures Cline can read and follow deterministic instructions to implement all remaining features, leveraging its capabilities to read the codebase, interpret instructions, generate code, and modify existing components within VSCode.
 
-## 1. Overview
-This guide outlines tasks to complete the "Monk Mode: Forge" React Native app, aligning with the Product Requirements Document (PRD). The app supports extreme focus through intention-setting, a task-linked timer, app-blocking, and brutal feedback. The codebase uses React Native with SQLite storage, targeting iOS and Android. Key gaps include app-blocking, animations, intention cycling, stats display, and analytics.
+Current Codebase Overview:
 
-**Existing Structure**:
-- **Navigation**: `App.tsx` with `NavigationContainer` and `createNativeStackNavigator`.
-- **Screens**: `OnboardingScreen.tsx`, `TodoListScreen.tsx`, `TaskDetailsScreen.tsx`, `TimerScreen.tsx`.
-- **Services**: `DatabaseService.ts`, `IntentionService.ts`, `SettingsService.ts`, `TimerService.ts`, `ExperienceService.ts`.
-- **UI**: `colors.ts` (black, orange, grey Extends xAI product capabilities, red, blue), `spacing.ts`, `TaskCard.tsx`, `ExperienceBar.tsx`.
-- **Dependencies**: `react-native-sqlite-storage`, `react-native-sound`, `react-native-safe-area-context`, `uuid`.
+App.tsx: Main app component with navigation.
+src/screens/: Screens for onboarding, to-do list, task details, and timer.
+src/services/: Services for database, settings, intentions, tasks, timer, etc.
+src/theme/: Theme definitions, including colors (e.g., black base, orange for North Star).
+Note on Development Approach: The PRD mentions CursorAI for no-code development, but the codebase uses React Native. This guide assumes React Native was chosen for better control and customization. Cline should proceed with React Native, modifying and leveraging existing components.
 
-**Tech Constraints**:
-- Local-only (SQLite, no cloud).
-- No authentication.
-- Bare React Native (no Expo).
-- Target iOS 14+/Android 10+.
+Suggested Order of Implementation
+To ensure dependencies and logical progression, implement features in this order:
 
-**Tone**: Brutal, focused, minimalistic—reflect the Monk Mode ethos in UX and code.
+Intention-Setting
+To-Do List
+Focus Timer
+Profile/Settings
+UX Flow
+Technical Integrations
+Feature Implementation
+1. Intention-Setting during Onboarding
+Files Involved:
 
----
+src/screens/Onboarding/OnboardingScreen.tsx
+src/services/intention/IntentionService.ts
+src/services/storage/DatabaseService.ts
+Requirements:
 
-## 2. Tasks
+Prompt new users to set a daily "North Star" intention (e.g., "Close 1 sales call").
+Provide cycling suggestions for the daily North Star, changing every 3 seconds, selectable by tapping.
+Prompt for three weekly intentions, with one optionally designated as the weekly North Star.
+Allow selection of a weekly reset day (default: Sunday).
+Save all intentions and reset day to the database.
+Implementation Steps:
 
-### 2.1 Intention-Setting
-**Goal**: Implement daily/weekly intention prompts with cycling suggestions and North Star designation.
+Open src/screens/Onboarding/OnboardingScreen.tsx.
+Add a <TextInput> for the daily North Star intention.
+Implement cycling suggestions:
+Define an array of suggestions (e.g., ["Close 1 sales call", "Record 1 YouTube script", "Write 500 words"]).
+Use useState and useEffect with setInterval to cycle suggestions every 3 seconds.
+Add an onPress handler to set the current suggestion as the North Star when tapped.
+After the daily North Star is set, render three <TextInput> fields for weekly intentions.
+Add a checkbox or star icon next to each weekly intention to designate one as the North Star.
+Include a <Picker> or dropdown for the reset day, with options ["Sunday", "Monday", ..., "Saturday"] and default "Sunday".
+On "Done" button press, call IntentionService.ts to save:
+Daily North Star.
+Weekly intentions (array with North Star flag).
+Reset day.
+Navigate to TodoList screen using the navigation prop.
+Tips:
 
-**Tasks**:
-1. **Update `OnboardingScreen.tsx`**:
-   - Add welcome screen with fire-orange logo (`#FF6200`, `assets/logo.png` placeholder).
-   - Prompt: “What’s the one win you want today?” (single text box).
-   - Weekly prompt: “Set 3 intentions—1 North Star” (3 text boxes, tap one for North Star).
-   - Reset day dropdown (default: Sunday).
-   - Tone: “This is your vow. Forge it.” (bold, centered text).
-   - Save to SQLite via `IntentionService.ts`.
-   - Duration: 2-3 min flow.
-2. **Implement Cycling Suggestions**:
-   - Daily examples: ["Close 1 sales call", "Record 1 YouTube script", "Outline $10K offer"].
-   - Weekly examples: ["Launch landing page", "Batch 5 posts", "Pitch 10 clients"].
-   - Use `setInterval` to cycle every 3s (greyed-out, opacity 0.5).
-   - Tap to select or type custom input.
-   - Apply to `OnboardingScreen.tsx` and daily prompt (new `IntentionPrompt.tsx` component).
-3. **Enhance `IntentionService.ts`**:
-   - Add methods: `setDailyNorthStar(text: string)`, `setWeeklyIntentions(intentions: string[], northStarIndex: number)`.
-   - Validate inputs (min 5 chars, max 100 chars).
-   - Store in SQLite (`intentions` table: `id`, `text`, `isNorthStar`, `isDaily`, `createdAt`).
-4. **UI Polish**:
-   - North Star text box: Orange glow (`shadowColor: #FF6200`, `shadowRadius: 5`).
-   - “Done” button: Orange background, white text, full-width.
-   - Font: Inter (add via `react-native-vector-icons` or custom font).
+Use clearInterval in useEffect cleanup to avoid memory leaks.
+Store intentions in DatabaseService.ts via IntentionService.ts (e.g., SQLite or AsyncStorage).
+Default the weekly North Star to the first intention if none is selected.
+Testing:
 
-**Files to Modify**:
-- `src/screens/Onboarding/OnboardingScreen.tsx`
-- `src/services/intention/IntentionService.ts`
-- New: `src/components/intention/IntentionPrompt.tsx`
+Check that suggestions cycle every 3 seconds and tapping selects one.
+Verify daily North Star and weekly intentions save correctly.
+Ensure reset day is stored and retrievable.
+Confirm navigation to TodoList after completion.
+2. Enhanced To-Do List
+Files Involved:
 
-**Dependencies**:
-- `react-native-vector-icons` (for Inter font, `npm install`).
+src/screens/TodoList/TodoListScreen.tsx
+src/components/task/TaskCard.tsx
+src/services/task/TaskService.ts
+src/services/intention/IntentionService.ts
+src/services/experience/ExperienceService.ts
+Requirements:
 
-**Estimated Time**: 1 week.
+Categorize tasks into "Today," "Next," and "Later" sections.
+Display daily North Star (orange, bold) and weekly intentions (grey) at the top.
+Highlight North Star-linked tasks with an orange glow.
+Enable swipe right to start the timer for a task.
+Add a checkmark to complete tasks, awarding exp points (+20 regular, +40 North Star).
+Implementation Steps:
 
----
+Open src/screens/TodoList/TodoListScreen.tsx.
+Fetch daily North Star and weekly intentions from IntentionService.ts.
+Render:
+Daily North Star in orange (color: "#FFA500", fontWeight: "bold").
+Weekly intentions below, with North Star in orange, others in grey (color: "#808080").
+Categorize tasks:
+Use TaskService.ts to fetch tasks and sort into "Today," "Next," "Later" based on due date or priority.
+Render as collapsible sections using a <FlatList> or <Accordion>.
+In src/components/task/TaskCard.tsx:
+Add conditional styling (e.g., borderColor: task.isNorthStar ? "#FFA500" : "transparent", borderWidth: 2) for North Star glow.
+Use react-native-gesture-handler to implement swipe right, navigating to Timer with task.id.
+Add a checkmark <TouchableOpacity>; on press:
+Update task status in TaskService.ts.
+Call ExperienceService.ts to add exp (task.isNorthStar ? 40 : 20).
+Refresh the task list after completion.
+Tips:
 
-### 2.2 Dashboard (To-Do List)
-**Goal**: Build a priority-based task list with North Star integration and swipe-to-timer.
+Install react-native-gesture-handler if not present (npm install react-native-gesture-handler).
+Link tasks to North Star via a northStarId field in the task model.
+Use useCallback to optimize gesture handlers.
+Testing:
 
-**Tasks**:
-1. **Update `TodoListScreen.tsx`**:
-   - Add top bar:
-     - Daily North Star: Orange, bold (`#FF6200`, `fontWeight: 700`).
-     - Weekly intentions: Grey (`#999999`), horizontal scroll.
-   - Task list sections: “Today”, “Next”, “Later” (collapsible via `TouchableOpacity`).
-   - Render tasks using `TaskCard.tsx`.
-2. **Enhance `TaskCard.tsx`**:
-   - Display task title, North Star tag (orange glow if tagged).
-   - Swipe right: Navigate to `TimerScreen` (`navigation.navigate('Timer', { taskId })`).
-   - Checkmark: Call `TaskService.completeTask(taskId)` (+20 exp, +40 for North Star).
-3. **Update `TaskDetailsScreen.tsx`**:
-   - Show: Time (“Focus: 25 min, Rest: 5 min”), subtasks (collapsible `FlatList`), progress bar (`ProgressBar` component), notes (text input).
-   - Buttons: “Start Timer”, “Add Subtask”, “Complete”.
-   - Progress bar: Calculate % (e.g., 2/3 subtasks = 66%).
-4. **Enhance `TaskService.ts`**:
-   - Add methods: `getTasksByCategory(category: 'Today' | 'Next' | 'Later')`, `addSubtask(taskId: string, text: string)`.
-   - Store subtasks in SQLite (`subtasks` table: `id`, `taskId`, `text`, `completed`).
-5. **UI Polish**:
-   - Black background (`#000000`), orange/grey accents.
-   - Font: Inter, clean sans-serif.
-   - Progress bar: Orange fill, grey track.
+Ensure intentions display with correct styling.
+Verify task categorization and collapsibility.
+Test swipe-to-timer navigation with correct task ID.
+Confirm exp points update correctly on task completion.
+3. Focus Timer with Modes and App-Blocking
+Files Involved:
 
-**Files to Modify**:
-- `src/screens/TodoList/TodoListScreen.tsx`
-- `src/components/task/TaskCard.tsx`
-- `src/screens/TaskDetails/TaskDetailsScreen.tsx`
-- `src/services/task/TaskService.ts`
-- New: `src/components/common/ProgressBar.tsx`
+src/screens/Timer/TimerScreen.tsx
+src/services/timer/TimerService.ts
+src/theme/colors.ts
+Requirements:
 
-**Dependencies**:
-- `react-native-gesture-handler` (for swipe, `npm install`).
+Focus mode: Red fire background with flame animation.
+Rest mode: Blue water background with wave animation.
+Timer options: Presets (25/5, 90/30, 50/10), custom timer, stopwatch.
+App-blocking in Focus mode (Full block, Reminder, Timer options).
+Haptic feedback and sound at start/end.
+Implementation Steps:
 
-**Estimated Time**: 2 weeks.
+Open src/screens/Timer/TimerScreen.tsx.
+Add state for mode ("focus" or "rest") and timer settings.
+Implement animations:
+Use <Animated.View> with backgroundColor: mode === "focus" ? "#FF0000" : "#0000FF".
+Add subtle flame/wave effects (e.g., Lottie files or react-native-reanimated).
+Render timer controls:
+Buttons for presets (25/5, 90/30, 50/10), custom input, and stopwatch toggle.
+Display linked task if passed from swipe.
+In src/services/timer/TimerService.ts:
+Create startTimer(duration, mode) to handle countdown and mode switching.
+Use setInterval for ticking, saving state to resume if app is backgrounded.
+For app-blocking:
+Research iOS Screen Time API and Android UsageStatsManager.
+Implement a basic version (e.g., overlay or notification) if full blocking isn’t feasible.
+Tie to user-selected option (Full, Reminder, Timer).
+Add react-native-haptic-feedback and react-native-sound for feedback at start/end.
+Tips:
 
----
+Install dependencies: npm install react-native-reanimated react-native-haptic-feedback react-native-sound.
+Use AppState to handle background timer continuity.
+Start with a simple app-blocking mock (e.g., alert) if OS integration is complex.
+Testing:
 
-### 2.3 Focus Timer
-**Goal**: Implement a task-linked timer with Focus/Rest modes, app-blocking, and animations.
+Verify animations match modes (red fire for Focus, blue water for Rest).
+Test all timer options for accuracy.
+Check app-blocking functionality per selected option.
+Ensure haptic feedback and sound trigger appropriately.
+4. Profile/Settings Screen
+Files Involved:
 
-**Tasks**:
-1. **Update `TimerScreen.tsx`**:
-   - Modes: Focus (red fire, `#FF0000`), Rest (blue water, `#00B7EB`).
-   - Display task title (Focus only, from `taskId`).
-   - Options: Presets (25/5, 90/30, 50/10), Custom (sliders), Stopwatch (minutes).
-   - Buttons: “Start/Pause”, “Switch Mode” (blue/red icon).
-2. **Add Animations**:
-   - Focus: Subtle flame animation (use `react-native-reanimated`).
-   - Rest: Gentle wave animation (same library).
-   - Ensure low battery impact (30 FPS max).
-3. **Implement App-Blocking**:
-   - **iOS**: Use Screen Time API (`react-native-screen-time`, placeholder package).
-     - Full block: Prevent app launch.
-     - Reminder: Show “You’re in Focus—resume?” (Yes/No).
-     - Timer: 30s countdown (custom 10-60s).
-   - **Android**: Use UsageStatsManager (`react-native-android-usage-stats`, placeholder).
-     - Similar blocking options.
-   - Default blocked apps: X, Instagram, YouTube (store in `SettingsService.ts`).
-   - Log breaches to SQLite (`breaches` table: `id`, `appName`, `timestamp`).
-4. **Add Haptics/Sound**:
-   - Haptic buzz: Use `react-native` Vibration API at start/end.
-   - Chime: Play via `react-native-sound` (`assets/sounds/chime.mp3` placeholder).
-   - Toggle in settings.
-5. **Enhance `TimerService.ts`**:
-   - Add methods: `startFocus(taskId: string, duration: number)`, `startRest(duration: number)`, `logBreach(appName: string)`.
-   - Sync time to tasks/intentions in SQLite (`time_logs` table: `id`, `taskId`, `mode`, `duration`, `timestamp`).
-6. **UI Polish**:
-   - Immersive full-screen, minimal text.
-   - Font: Inter.
-   - Swipe from `TaskCard` to enter.
+src/screens/ProfileSettings.tsx (create new)
+src/services/settings/SettingsService.ts
+src/services/experience/ExperienceService.ts
+src/services/timer/TimerService.ts
+src/services/task/TaskService.ts
+Requirements:
 
-**Files to Modify**:
-- `src/screens/Timer/TimerScreen.tsx`
-- `src/services/timer/TimerService.ts`
-- `src/services/settings/SettingsService.ts`
-- New: `src/components/animation/FlameAnimation.tsx`, `WaveAnimation.tsx`
+Show stats: Focus time, Rest time, Distracted breaches, tasks completed, exp bar.
+Settings: Weekly reset day, timer presets, Focus/Rest block lists, sound/haptics toggles.
+Implementation Steps:
 
-**Dependencies**:
-- `react-native-reanimated` (animations, `npm install`).
-- `react-native-vibration` (haptics, `npm install`).
-- Placeholder: `react-native-screen-time`, `react-native-android-usage-stats`.
+Create src/screens/ProfileSettings.tsx.
+Fetch stats:
+From TimerService.ts: Focus/Rest time, breaches.
+From TaskService.ts: Tasks completed.
+From ExperienceService.ts: Exp points and level.
+Render stats and an exp bar (e.g., react-native-progress with progress: exp / nextLevelExp).
+Add settings:
+<Picker> for reset day.
+Inputs for preset customization (e.g., array of { focus: 25, rest: 5 }).
+Block list <FlatList> with add/remove and type picker (Full, Reminder, Timer).
+<Switch> for sound and haptics.
+Save changes to SettingsService.ts on update.
+Tips:
 
-**Estimated Time**: 3 weeks.
+Install react-native-progress (npm install react-native-progress).
+Persist block lists as JSON in SettingsService.ts.
+Calculate stats dynamically for real-time updates.
+Testing:
 
----
+Verify stats display accurately.
+Check exp bar reflects progress.
+Test each setting saves and applies correctly.
+5. UX Flow for Daily and Weekly Intentions
+Files Involved:
 
-### 2.4 Profile/Settings
-**Goal**: Create a Profile screen for stats and settings with brutal feedback.
+App.tsx
+src/screens/Onboarding/OnboardingScreen.tsx
+src/screens/TodoList/TodoListScreen.tsx
+src/services/settings/SettingsService.ts
+src/services/intention/IntentionService.ts
+Requirements:
 
-**Tasks**:
-1. **Create `ProfileScreen.tsx`**:
-   - Stats:
-     - “This Week: Xh Focus, Yh Rest, Z Distracted breaches”.
-     - “Tasks Completed: N (M North Star)”.
-     - Exp bar: “Monk Level L - X/500” (orange, `ExperienceBar.tsx`, resets weekly).
-   - Navigation: Add to stack (`App.tsx`).
-2. **Update `SettingsService.ts`**:
-   - Add methods: `setResetDay(day: string)`, `setTimerPresets(presets: {focus: number, rest: number}[])`, `setBlockList(mode: 'Focus' | 'Rest', apps: string[])`, `toggleSound(enabled: boolean)`, `toggleHaptics(enabled: boolean)`.
-   - Store in SQLite (`settings` table: `key`, `value`).
-3. **Enhance `ExperienceService.ts`**:
-   - Add methods: `getWeeklyStats()`, `resetWeeklyExp()`.
-   - Calculate: Focus/Rest hours, breaches, tasks completed.
-   - Exp rules: +10/focus hour, +20/task, x2 for North Star.
-4. **UI Polish**:
-   - Black base, orange accents, white stats (`#FFFFFF`).
-   - Font: Inter.
-   - Thin orange exp bar.
+First login: Onboarding for intentions and reset day.
+Daily: Prompt to set/review daily North Star.
+Reset day: Prompt for new weekly intentions.
+Implementation Steps:
 
-**Files to Modify**:
-- `src/App.tsx`
-- `src/services/settings/SettingsService.ts`
-- `src/services/experience/ExperienceService.ts`
-- `src/components/experience/ExperienceBar.tsx`
-- New: `src/screens/Profile/ProfileScreen.tsx`
+In App.tsx, check SettingsService.ts for isOnboardingComplete; if false, navigate to OnboardingScreen.
+In OnboardingScreen.tsx, set isOnboardingComplete: true after intentions are saved.
+In App.tsx, on start:
+Compare current date with reset day and last reset (stored in SettingsService.ts).
+If reset day, show <Modal> to set new weekly intentions via IntentionService.ts.
+Prompt daily North Star with a dismissible <Modal> or banner.
+Update TodoListScreen.tsx to reflect new intentions.
+Tips:
 
-**Estimated Time**: 2 weeks.
+Use react-native-modal (npm install react-native-modal).
+Store lastResetDate as a timestamp in SettingsService.ts.
+Keep prompts lightweight and optional.
+Testing:
 
----
+Test onboarding on first launch.
+Verify daily North Star prompt appears and saves.
+Check reset day triggers weekly intention prompt.
+6. Technical Integrations
+Files Involved:
 
-### 2.5 Analytics
-**Goal**: Track success metrics for launch validation.
+Varies by integration.
+Requirements:
 
-**Tasks**:
-1. **Integrate Firebase Analytics**:
-   - Install: `react-native-firebase/analytics` (`npm install`).
-   - Events:
-     - `app_open`: Daily app opens.
-     - `north_star_set`: Daily North Star set (80% target).
-     - `focus_time`: Weekly Focus hours (5+ target).
-     - `retention`: User returns after 30 days (70% target).
-   - Log in `App.tsx` and relevant services.
-2. **Store Metrics Locally**:
-   - Add to SQLite (`analytics` table: `event`, `value`, `timestamp`).
-   - Export to Firebase on app start (offline support).
-3. **Test Metrics**:
-   - Simulate 100 beta users (mock data in `mockData.ts`).
-   - Verify event accuracy.
+(Optional) Google Calendar API for read-only event access.
+App-blocking via OS APIs.
+Implementation Steps:
 
-**Files to Modify**:
-- `src/App.tsx`
-- `src/services/storage/DatabaseService.ts`
-- `src/services/task/mockData.ts`
+Google Calendar (Optional):
+Install react-native-google-signin (npm install @react-native-google-signin/google-signin).
+Implement OAuth flow and fetch events using Google Calendar API.
+Display events in TodoListScreen.tsx.
+App-Blocking:
+iOS: Explore Screen Time API or custom overlay.
+Android: Use UsageStatsManager or AccessibilityService.
+Start with a simple implementation (e.g., warning when leaving app in Focus mode).
+Integrate with TimerService.ts settings.
+Tips:
 
-**Dependencies**:
-- `react-native-firebase/analytics` (`npm install`).
+Skip Calendar integration if time-constrained; mark as optional in code comments.
+Use existing RN modules for app-blocking if available.
+Testing:
 
-**Estimated Time**: 1 week.
+Verify Calendar events display (if implemented).
+Test app-blocking on iOS/Android during Focus mode.
+Final Checklist
+Before completion, Cline must confirm:
 
----
-
-## 3. Workflow
-1. **Setup**:
-   - Clone repo, run `npm install`, `bundle install`, `pod install` (iOS).
-   - Verify build: `npm run ios`, `npm run android`.
-2. **Task Order**:
-   - Intention-Setting (core UX).
-   - Dashboard (task organization).
-   - Focus Timer (key feature).
-   - Profile/Settings (feedback loop).
-   - Analytics (validation).
-3. **Coding**:
-   - Use TypeScript, follow `.eslintrc.js`, `.prettierrc.js`.
-   - Commit per feature: `git commit -m "Add intention cycling"`.
-   - Test each component: Update `App.test.tsx`, run `npm test`.
-4. **Validation**:
-   - Match PRD UX: Black base, orange North Star, fire/water visuals.
-   - Verify SQLite schema: Intentions, tasks, time logs, breaches.
-   - Simulate beta: 100 users, 1 month, check metrics.
-5. **Debugging**:
-   - Log errors to console (`console.error`).
-   - Test edge cases: Empty intentions, long tasks, app-block failures.
-
----
-
-## 4. Deliverables
-- Updated codebase with all features.
-- SQLite schema: `intentions`, `tasks`, `subtasks`, `time_logs`, `breaches`, `settings`, `analytics`.
-- Tests: 80% coverage (`jest.config.js`).
-- Docs: Update `README.md` with feature list and setup.
-- Beta report: Metrics for 100 users (downloads, North Star, Focus time, retention).
-
----
-
-## 5. Success Criteria
-- **Functionality**: All PRD features implemented (intention-setting, dashboard, timer, profile, analytics).
-- **UX**: Black/orange/grey theme, fire/water animations, Inter font, brutal tone.
-- **Performance**: <500ms screen load, <10% battery/hour (timer active).
-- **Metrics**: Ready for 10K users (80% North Star, 5h Focus, 70% retention).
-
----
-
-## 6. Notes
-- **PRD Reference**: Intention-timer fusion, brutal Monk Mode ethos.
-- **Risks**:
-  - App-blocking APIs: Fallback to reminder pop-ups if restricted.
-  - Animation lag: Cap at 30 FPS, test on low-end devices (e.g., iPhone 8, Android 10).
-  - Vague intentions: Enforce validation (5+ chars).
-- **Tone**: Code comments should be clear, minimal, intense—e.g., `// Locks focus, no mercy`.
-- **Beta**: Target X/Reddit r/productivity for 100 testers.
-
-Complete these tasks with relentless focus. Forge the app as a weapon for Monk Mode users.
+ All PRD features are implemented and functional.
+ UI adheres to specs (black base, orange North Star, fire/water themes).
+ App works on iOS and Android.
+ Inputs are validated and errors handled.
+ Database integrity is maintained.
+ Performance is smooth (no lags/crashes).
+ Changes are committed to version control.
+Once checked, "Monk Mode: Forge" is ready for release.
