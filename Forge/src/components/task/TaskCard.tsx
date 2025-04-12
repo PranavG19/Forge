@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useRef} from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,16 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-} from "react-native";
-import { Task, TaskStatus, TaskPriority } from "../../models/Task";
-import { colors } from "../../theme/colors";
-import { spacing } from "../../theme/spacing";
+  Animated,
+  PanResponder,
+  Dimensions,
+} from 'react-native';
+import {Task, TaskStatus, TaskPriority} from '../../models/Task';
+import {colors} from '../../theme/colors';
+import {spacing} from '../../theme/spacing';
 
 // Enable LayoutAnimation for Android
-if (Platform.OS === "android") {
+if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
@@ -32,6 +35,49 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onComplete,
   onStartTimer,
 }) => {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const screenWidth = Dimensions.get('window').width;
+  const swipeThreshold = screenWidth * 0.25; // 25% of screen width
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to horizontal movements
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy * 3);
+      },
+      onPanResponderGrant: () => {
+        pan.setOffset({
+          x: 0,
+          y: 0,
+        });
+      },
+      onPanResponderMove: Animated.event([null, {dx: pan.x}], {
+        useNativeDriver: false,
+      }),
+      onPanResponderRelease: (_, gestureState) => {
+        pan.flattenOffset();
+
+        // If swiped right far enough and timer function exists
+        if (gestureState.dx > swipeThreshold && onStartTimer) {
+          // Reset position with animation
+          Animated.spring(pan, {
+            toValue: {x: 0, y: 0},
+            useNativeDriver: false,
+          }).start();
+
+          // Start timer
+          onStartTimer(task);
+        } else {
+          // Reset position
+          Animated.spring(pan, {
+            toValue: {x: 0, y: 0},
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
   const handleComplete = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onComplete(task);
@@ -43,67 +89,70 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
 
     const completedSubtasks = task.subtasks.filter(
-      (subtask) => subtask.status === TaskStatus.COMPLETED
+      subtask => subtask.status === TaskStatus.COMPLETED,
     ).length;
 
     return Math.round((completedSubtasks / task.subtasks.length) * 100);
   };
-
   return (
-    <TouchableOpacity
-      style={[
-        styles.container,
-        task.priority === TaskPriority.NORTH_STAR && styles.northStarContainer,
-      ]}
-      onPress={() => onPress(task)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.checkbox,
-              task.status === TaskStatus.COMPLETED && styles.checkboxCompleted,
-            ]}
-            onPress={handleComplete}
-          >
-            {task.status === TaskStatus.COMPLETED && (
-              <Text style={styles.checkmark}>✓</Text>
-            )}
-          </TouchableOpacity>
-          <Text
-            style={[
-              styles.title,
-              task.status === TaskStatus.COMPLETED && styles.titleCompleted,
-            ]}
-          >
-            {task.title}
-          </Text>
-        </View>
-        {onStartTimer && (
-          <TouchableOpacity
-            style={styles.timerButton}
-            onPress={() => onStartTimer(task)}
-          >
-            <Text style={styles.timerButtonText}>▶</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {task.subtasks.length > 0 && (
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
+    <Animated.View
+      style={{
+        transform: [{translateX: pan.x}],
+      }}
+      {...panResponder.panHandlers}>
+      <TouchableOpacity
+        style={[
+          styles.container,
+          task.priority === TaskPriority.NORTH_STAR &&
+            styles.northStarContainer,
+        ]}
+        onPress={() => onPress(task)}
+        activeOpacity={0.7}>
+        <View style={styles.header}>
+          <View style={styles.titleContainer}>
+            <TouchableOpacity
               style={[
-                styles.progressFill,
-                { width: `${getProgressPercentage()}%` },
+                styles.checkbox,
+                task.status === TaskStatus.COMPLETED &&
+                  styles.checkboxCompleted,
               ]}
-            />
+              onPress={handleComplete}>
+              {task.status === TaskStatus.COMPLETED && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.title,
+                task.status === TaskStatus.COMPLETED && styles.titleCompleted,
+              ]}>
+              {task.title}
+            </Text>
           </View>
-          <Text style={styles.progressText}>{getProgressPercentage()}%</Text>
+          {onStartTimer && (
+            <TouchableOpacity
+              style={styles.timerButton}
+              onPress={() => onStartTimer(task)}>
+              <Text style={styles.timerButtonText}>▶</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
-    </TouchableOpacity>
+
+        {task.subtasks.length > 0 && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {width: `${getProgressPercentage()}%`},
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>{getProgressPercentage()}%</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -121,13 +170,13 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
   checkbox: {
@@ -137,8 +186,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.text.secondary,
     marginRight: spacing.sm,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   checkboxCompleted: {
     backgroundColor: colors.primary,
@@ -147,7 +196,7 @@ const styles = StyleSheet.create({
   checkmark: {
     color: colors.text.primary,
     fontSize: spacing.icon.sm,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   title: {
     color: colors.text.primary,
@@ -155,7 +204,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleCompleted: {
-    textDecorationLine: "line-through",
+    textDecorationLine: 'line-through',
     color: colors.text.secondary,
   },
   timerButton: {
@@ -163,8 +212,8 @@ const styles = StyleSheet.create({
     height: spacing.icon.lg,
     borderRadius: spacing.icon.lg / 2,
     backgroundColor: colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: spacing.sm,
   },
   timerButtonText: {
@@ -173,8 +222,8 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginTop: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressBar: {
     flex: 1,
@@ -182,10 +231,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border.default,
     borderRadius: spacing.borderRadius.sm,
     marginRight: spacing.sm,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   progressFill: {
-    position: "absolute",
+    position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
