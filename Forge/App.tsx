@@ -13,6 +13,8 @@ import {databaseService} from './src/services/storage/DatabaseService';
 import {settingsService} from './src/services/settings/SettingsService';
 import {analyticsService} from './src/services/analytics/AnalyticsService';
 import {experienceService} from './src/services/experience/ExperienceService';
+import {weeklyResetService} from './src/services/reset/WeeklyResetService';
+import WeeklyResetModal from './src/components/modals/WeeklyResetModal';
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -30,6 +32,7 @@ const App = () => {
   const [initialRoute, setInitialRoute] = useState<
     keyof RootStackParamList | null
   >(null);
+  const [showWeeklyResetModal, setShowWeeklyResetModal] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -41,8 +44,11 @@ const App = () => {
 
         // Check for weekly reset
         if (onboardingCompleted) {
-          await settingsService.checkWeeklyReset();
-          await experienceService.checkAndResetWeeklyExp();
+          // Use our new WeeklyResetService instead
+          const shouldReset = await weeklyResetService.checkForReset();
+          if (shouldReset) {
+            setShowWeeklyResetModal(true);
+          }
         }
 
         // Track app open and check retention
@@ -79,6 +85,11 @@ const App = () => {
   if (!initialRoute) {
     return null;
   }
+
+  // Handle weekly reset modal close
+  const handleWeeklyResetModalClose = () => {
+    setShowWeeklyResetModal(false);
+  };
 
   return (
     <NavigationContainer>
@@ -135,6 +146,12 @@ const App = () => {
           }}
         />
       </Stack.Navigator>
+
+      {/* Weekly Reset Modal */}
+      <WeeklyResetModal
+        visible={showWeeklyResetModal}
+        onClose={handleWeeklyResetModalClose}
+      />
     </NavigationContainer>
   );
 };

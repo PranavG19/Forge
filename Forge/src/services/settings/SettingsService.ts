@@ -71,9 +71,36 @@ export class SettingsService extends EventEmitter {
         );
       }
 
+      // Load all settings from the database
+      await this.loadAllSettings();
+
       this.initialized = true;
     } catch (error) {
       console.error('Failed to initialize settings database:', error);
+      throw error;
+    }
+  }
+
+  private async loadAllSettings(): Promise<void> {
+    try {
+      const [result] = await databaseService.executeSql(
+        'SELECT key, value FROM settings',
+      );
+
+      for (let i = 0; i < result.rows.length; i++) {
+        const row = result.rows.item(i);
+        const key = row.key as keyof AppSettings;
+        try {
+          this.settings[key] = JSON.parse(row.value);
+        } catch (e) {
+          console.error(`Failed to parse setting value for key ${key}:`, e);
+          this.settings[key] = row.value as any;
+        }
+      }
+
+      console.log('Settings loaded from database:', this.settings);
+    } catch (error) {
+      console.error('Failed to load settings from database:', error);
       throw error;
     }
   }
@@ -118,6 +145,29 @@ export class SettingsService extends EventEmitter {
     key: K,
   ): Promise<AppSettings[K]> {
     await this.initializeDatabase();
+
+    // If the setting doesn't exist in memory, try to load it from the database
+    if (this.settings[key] === undefined) {
+      try {
+        const [result] = await databaseService.executeSql(
+          'SELECT value FROM settings WHERE key = ?',
+          [key],
+        );
+
+        if (result.rows.length > 0) {
+          const value = result.rows.item(0).value;
+          try {
+            this.settings[key] = JSON.parse(value);
+          } catch (e) {
+            console.error(`Failed to parse setting value for key ${key}:`, e);
+            this.settings[key] = value as any;
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to get setting for key ${key}:`, error);
+      }
+    }
+
     return this.settings[key];
   }
 

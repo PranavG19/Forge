@@ -63,6 +63,30 @@ export class ExperienceService extends EventEmitter {
         )
       `);
 
+      // Create the main experience table to track total and weekly experience
+      await databaseService.executeSql(`
+        CREATE TABLE IF NOT EXISTS experience (
+          id INTEGER PRIMARY KEY,
+          totalExp INTEGER NOT NULL DEFAULT 0,
+          weeklyExp INTEGER NOT NULL DEFAULT 0,
+          lastResetDate TEXT NOT NULL
+        )
+      `);
+
+      // Check if we need to initialize the experience record
+      const [result] = await databaseService.executeSql(
+        'SELECT COUNT(*) as count FROM experience',
+      );
+
+      if (result.rows.item(0).count === 0) {
+        // Initialize with default values
+        await databaseService.executeSql(
+          `INSERT INTO experience (id, totalExp, weeklyExp, lastResetDate)
+           VALUES (?, ?, ?, ?)`,
+          [1, 0, 0, new Date().toISOString()],
+        );
+      }
+
       this.initialized = true;
     } catch (error) {
       console.error('Failed to initialize experience database:', error);
@@ -74,11 +98,18 @@ export class ExperienceService extends EventEmitter {
     type: 'focus' | 'task' | 'northStar',
     value: number,
   ): Promise<void> {
+    await this.initializeDatabase();
+
+    // Log the experience gain
     await databaseService.executeSql(
       `INSERT INTO experience_logs (id, type, value, timestamp)
        VALUES (?, ?, ?, ?)`,
       [uuidv4(), type, value, new Date().toISOString()],
     );
+
+    // Update the total experience
+    await this.addExp(value);
+
     this.emit('experienceLogged', {type, value});
   }
 
@@ -156,7 +187,7 @@ export class ExperienceService extends EventEmitter {
     await this.initializeDatabase();
     const hours = minutes / 60;
     const exp = Math.floor(hours * ExperienceService.EXP_PER_FOCUS_HOUR);
-    await this.addExp(exp);
+    await this.logExperience('focus', exp);
   }
 
   async addTaskCompletionExp(isNorthStar: boolean): Promise<void> {
@@ -165,23 +196,38 @@ export class ExperienceService extends EventEmitter {
     const exp = isNorthStar
       ? baseExp * ExperienceService.NORTH_STAR_MULTIPLIER
       : baseExp;
-    await this.addExp(exp);
+    await this.logExperience(isNorthStar ? 'northStar' : 'task', exp);
   }
 
   private async addExp(amount: number): Promise<void> {
+    await this.initializeDatabase();
+
     try {
+      // Get current stats before update
+      const oldStats = await this.getStats();
+
+      // Update experience
       await databaseService.executeSql(
-        `
-        UPDATE experience
-        SET totalExp = totalExp + ?,
-            weeklyExp = weeklyExp + ?
-        WHERE id = 1
-      `,
+        `UPDATE experience
+         SET totalExp = totalExp + ?,
+             weeklyExp = weeklyExp + ?
+         WHERE id = 1`,
         [amount, amount],
       );
 
-      const stats = await this.getStats();
-      this.emit('experienceGained', {amount, stats});
+      // Get new stats after update
+      const newStats = await this.getStats();
+
+      // Check if level up occurred
+      if (newStats.level > oldStats.level) {
+        this.emit('levelUp', {
+          oldLevel: oldStats.level,
+          newLevel: newStats.level,
+          stats: newStats,
+        });
+      }
+
+      this.emit('experienceGained', {amount, stats: newStats});
     } catch (error) {
       console.error('Error adding experience:', error);
       throw error;
@@ -228,6 +274,14 @@ export class ExperienceService extends EventEmitter {
 
       if (daysSinceReset >= 7) {
         await this.resetWeeklyExp();
+
+        // Update the last reset date
+        await databaseService.executeSql(
+          'UPDATE experience SET lastResetDate = ?, weeklyExp = 0 WHERE id = 1',
+          [now.toISOString()],
+        );
+
+        this.emit('weeklyExpReset');
       }
     } catch (error) {
       console.error('Error checking weekly experience reset:', error);

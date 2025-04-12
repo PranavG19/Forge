@@ -1,20 +1,20 @@
 export enum TaskPriority {
-  LOW = "LOW",
-  MEDIUM = "MEDIUM",
-  HIGH = "HIGH",
-  NORTH_STAR = "NORTH_STAR",
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  NORTH_STAR = 'NORTH_STAR',
 }
 
 export enum TaskStatus {
-  TODO = "TODO",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
+  TODO = 'TODO',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
 }
 
 export enum TaskCategory {
-  TODAY = "TODAY",
-  NEXT = "NEXT",
-  LATER = "LATER",
+  TODAY = 'TODAY',
+  NEXT = 'NEXT',
+  LATER = 'LATER',
 }
 
 export interface SubTask {
@@ -22,6 +22,7 @@ export interface SubTask {
   parentId: string;
   title: string;
   status: TaskStatus;
+  estimatedMinutes?: number; // in minutes
   createdAt: string;
   updatedAt: string;
 }

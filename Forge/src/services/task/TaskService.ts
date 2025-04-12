@@ -137,6 +137,21 @@ class TaskService {
     });
   }
 
+  async uncompleteSubtask(subtaskId: string): Promise<void> {
+    return this.withDB(async () => {
+      await databaseService.updateSubtaskStatus(subtaskId, TaskStatus.TODO);
+    });
+  }
+
+  async updateSubtasks(taskId: string, subtasks: SubTask[]): Promise<void> {
+    return this.withDB(async () => {
+      const task = await this.getTask(taskId);
+      task.subtasks = subtasks;
+      task.updatedAt = new Date().toISOString();
+      await databaseService.addTask(task); // Update the task with modified subtasks
+    });
+  }
+
   async deleteTask(taskId: string): Promise<void> {
     return this.withDB(() => databaseService.deleteTask(taskId));
   }

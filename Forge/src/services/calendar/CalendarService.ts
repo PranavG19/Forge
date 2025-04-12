@@ -1,5 +1,6 @@
 import {EventEmitter} from 'events';
 import {Platform} from 'react-native';
+import {googleCalendarService} from './GoogleCalendarService';
 
 export interface CalendarEvent {
   id: string;
@@ -31,10 +32,10 @@ export class CalendarService extends EventEmitter {
    */
   async requestCalendarAccess(): Promise<boolean> {
     try {
-      // This would use the actual Google Calendar API or native calendar APIs
-      // For now, we'll simulate a successful authorization
-      this.authorized = true;
-      return true;
+      // Use Google Calendar service for authorization
+      const granted = await googleCalendarService.requestCalendarAccess();
+      this.authorized = granted;
+      return granted;
     } catch (error) {
       console.error('Failed to request calendar access:', error);
       return false;
@@ -49,6 +50,21 @@ export class CalendarService extends EventEmitter {
   }
 
   /**
+   * Check authorization status with Google Calendar
+   */
+  async checkAuthorizationStatus(): Promise<boolean> {
+    try {
+      const isAuth = await googleCalendarService.isAuthorized();
+      this.authorized = isAuth;
+      return isAuth;
+    } catch (error) {
+      console.error('Failed to check authorization status:', error);
+      this.authorized = false;
+      return false;
+    }
+  }
+
+  /**
    * Get events for today
    */
   async getTodayEvents(): Promise<CalendarEvent[]> {
@@ -57,28 +73,8 @@ export class CalendarService extends EventEmitter {
     }
 
     try {
-      // This would use the actual Google Calendar API
-      // For now, we'll return mock data
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-
-      return [
-        {
-          id: '1',
-          title: 'Team Meeting',
-          startTime: `${todayStr}T10:00:00`,
-          endTime: `${todayStr}T11:00:00`,
-          location: 'Conference Room A',
-          allDay: false,
-        },
-        {
-          id: '2',
-          title: 'Project Deadline',
-          startTime: `${todayStr}T17:00:00`,
-          endTime: `${todayStr}T17:30:00`,
-          allDay: false,
-        },
-      ];
+      // Use Google Calendar service to get today's events
+      return await googleCalendarService.getTodayEvents();
     } catch (error) {
       console.error('Failed to get today events:', error);
       return [];
@@ -94,35 +90,8 @@ export class CalendarService extends EventEmitter {
     }
 
     try {
-      // This would use the actual Google Calendar API
-      // For now, we'll return mock data
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
-
-      return [
-        {
-          id: '1',
-          title: 'Team Meeting',
-          startTime: `${startStr}T10:00:00`,
-          endTime: `${startStr}T11:00:00`,
-          location: 'Conference Room A',
-          allDay: false,
-        },
-        {
-          id: '2',
-          title: 'Project Deadline',
-          startTime: `${startStr}T17:00:00`,
-          endTime: `${startStr}T17:30:00`,
-          allDay: false,
-        },
-        {
-          id: '3',
-          title: 'Weekly Review',
-          startTime: `${endStr}T14:00:00`,
-          endTime: `${endStr}T15:00:00`,
-          allDay: false,
-        },
-      ];
+      // Use Google Calendar service to get events for the date range
+      return await googleCalendarService.getEvents(startDate, endDate);
     } catch (error) {
       console.error('Failed to get events:', error);
       return [];

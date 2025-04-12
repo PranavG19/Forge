@@ -15,6 +15,9 @@ import {Task, TaskStatus} from '../../models/Task';
 import {taskService} from '../../services/task/TaskService';
 import {colors} from '../../theme/colors';
 import {spacing} from '../../theme/spacing';
+import {SubtaskList, Subtask} from '../../components/task/SubtaskList';
+import {SubtaskProgress} from '../../components/task/SubtaskProgress';
+import {SwipeableTask} from '../../components/task/SwipeableTask';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetails'>;
 
@@ -91,15 +94,44 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       setAddingSubtask(false);
     }
   };
-
-  const handleCompleteSubtask = async (subtaskId: string) => {
+  const handleCompleteSubtask = async (
+    subtaskId: string,
+    completed: boolean,
+  ) => {
     try {
-      await taskService.completeSubtask(subtaskId);
+      if (completed) {
+        await taskService.completeSubtask(subtaskId);
+      } else {
+        await taskService.uncompleteSubtask(subtaskId);
+      }
       // Reload task to show updated subtask status
       await loadTask();
     } catch (err) {
-      console.error('Error completing subtask:', err);
-      Alert.alert('Error', 'Failed to complete subtask');
+      console.error('Error updating subtask:', err);
+      Alert.alert('Error', 'Failed to update subtask');
+    }
+  };
+
+  const handleUpdateSubtasks = async (subtasks: Subtask[]) => {
+    try {
+      if (!task) return;
+
+      // Convert to the format expected by the task service
+      const updatedSubtasks = subtasks.map(subtask => ({
+        id: subtask.id,
+        parentId: task.id,
+        title: subtask.title,
+        status: subtask.completed ? TaskStatus.COMPLETED : TaskStatus.TODO,
+        estimatedMinutes: subtask.estimatedMinutes,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+
+      await taskService.updateSubtasks(task.id, updatedSubtasks);
+      await loadTask();
+    } catch (err) {
+      console.error('Error updating subtasks:', err);
+      Alert.alert('Error', 'Failed to update subtasks');
     }
   };
 
@@ -119,19 +151,16 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
     );
   }
 
-  const renderProgressBar = () => {
-    if (!task) return null;
+  // Convert task subtasks to the format expected by SubtaskList
+  const convertSubtasks = (): Subtask[] => {
+    if (!task) return [];
 
-    const progress = taskService.calculateTaskProgress(task);
-
-    return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, {width: `${progress}%`}]} />
-        </View>
-        <Text style={styles.progressText}>{progress}% Complete</Text>
-      </View>
-    );
+    return task.subtasks.map(subtask => ({
+      id: subtask.id,
+      title: subtask.title,
+      completed: subtask.status === TaskStatus.COMPLETED,
+      estimatedMinutes: subtask.estimatedMinutes || 15,
+    }));
   };
 
   return (
@@ -192,7 +221,7 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       {/* Progress Section */}
       <View style={styles.section}>
         <Text style={styles.label}>Progress</Text>
-        {renderProgressBar()}
+        <SubtaskProgress subtasks={convertSubtasks()} />
       </View>
 
       {/* Notes Section */}
@@ -206,69 +235,22 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       {/* Subtasks Section */}
       <View style={styles.section}>
         <Text style={styles.label}>Subtasks</Text>
-        {task.subtasks.length > 0 ? (
-          task.subtasks.map(subtask => (
-            <TouchableOpacity
-              key={subtask.id}
-              style={styles.subtaskItem}
-              onPress={() => handleCompleteSubtask(subtask.id)}>
-              <View
-                style={[
-                  styles.subtaskCheckbox,
-                  subtask.status === TaskStatus.COMPLETED &&
-                    styles.subtaskCheckboxCompleted,
-                ]}>
-                {subtask.status === TaskStatus.COMPLETED && (
-                  <Text style={styles.checkmark}>✓</Text>
-                )}
-              </View>
-              <Text
-                style={[
-                  styles.subtaskTitle,
-                  subtask.status === TaskStatus.COMPLETED &&
-                    styles.subtaskTitleCompleted,
-                ]}>
-                {subtask.title}
-              </Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.emptySubtasks}>No subtasks yet</Text>
-        )}
-
-        {/* Add Subtask Input */}
-        <View style={styles.addSubtaskContainer}>
-          <TextInput
-            style={styles.subtaskInput}
-            value={newSubtaskTitle}
-            onChangeText={setNewSubtaskTitle}
-            placeholder="New subtask..."
-            placeholderTextColor={colors.text.secondary}
-          />
-          <TouchableOpacity
-            style={[
-              styles.addSubtaskButton,
-              (!newSubtaskTitle.trim() || addingSubtask) &&
-                styles.disabledButton,
-            ]}
-            onPress={handleAddSubtask}
-            disabled={!newSubtaskTitle.trim() || addingSubtask}>
-            {addingSubtask ? (
-              <ActivityIndicator size="small" color={colors.text.primary} />
-            ) : (
-              <Text style={styles.buttonText}>Add</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <SubtaskList
+          subtasks={convertSubtasks()}
+          onSubtasksChange={handleUpdateSubtasks}
+          onSubtaskComplete={handleCompleteSubtask}
+        />
       </View>
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.timerButton]}
-          onPress={handleStartTimer}>
-          <Text style={styles.buttonText}>Start Timer</Text>
-        </TouchableOpacity>
+        <SwipeableTask onSwipeRight={handleStartTimer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.timerButton]}
+            onPress={handleStartTimer}>
+            <Text style={styles.buttonText}>Start Timer</Text>
+          </TouchableOpacity>
+        </SwipeableTask>
 
         <TouchableOpacity
           style={[

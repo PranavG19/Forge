@@ -26,23 +26,38 @@ export const CalendarEvents: React.FC<CalendarEventsProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadEvents();
+    checkAuthAndLoadEvents();
   }, []);
+
+  // Check authorization status and load events if authorized
+  const checkAuthAndLoadEvents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check if calendar access is authorized with Google
+      const isAuth = await calendarService.checkAuthorizationStatus();
+      setAuthorized(isAuth);
+
+      if (isAuth) {
+        await loadEvents();
+      }
+    } catch (err) {
+      console.error('Error checking authorization:', err);
+      setAuthorized(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadEvents = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Check if calendar access is authorized
-      const isAuthorized = calendarService.isAuthorized();
-      setAuthorized(isAuthorized);
-
-      if (isAuthorized) {
-        // Get today's events
-        const todayEvents = await calendarService.getTodayEvents();
-        setEvents(todayEvents);
-      }
+      // Get today's events
+      const todayEvents = await calendarService.getTodayEvents();
+      setEvents(todayEvents);
     } catch (err) {
       console.error('Error loading calendar events:', err);
       setError('Failed to load calendar events');
@@ -98,10 +113,15 @@ export const CalendarEvents: React.FC<CalendarEventsProps> = ({
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Calendar Events</Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        <Text style={styles.description}>
+          Connect your Google Calendar to see your events here and plan your
+          focus time around your schedule.
+        </Text>
         <TouchableOpacity
           style={styles.accessButton}
           onPress={handleRequestAccess}>
-          <Text style={styles.accessButtonText}>Connect Calendar</Text>
+          <Text style={styles.accessButtonText}>Connect Google Calendar</Text>
         </TouchableOpacity>
       </View>
     );
@@ -135,6 +155,12 @@ export const CalendarEvents: React.FC<CalendarEventsProps> = ({
 };
 
 const styles = StyleSheet.create({
+  description: {
+    color: colors.text.secondary,
+    fontSize: spacing.sm,
+    marginBottom: spacing.md,
+    lineHeight: spacing.md * 1.2,
+  },
   container: {
     padding: spacing.md,
     backgroundColor: colors.surface,

@@ -1,19 +1,33 @@
-import React from 'react';
-import {StyleSheet, Animated, View} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import {StyleSheet, Animated, View, Dimensions} from 'react-native';
 import {colors} from '../../theme/colors';
+import {fluidSimulation, FluidPoint} from '../../utils/animation/fluidDynamics';
+import {particleSystem, Particle} from '../../utils/animation/particleSystem';
+import {WaterParticle} from './WaterParticle';
 
 interface Props {
   style?: any;
+  particleCount?: number;
 }
 
-export const WaveAnimation: React.FC<Props> = ({style}) => {
+export const WaveAnimation: React.FC<Props> = ({style, particleCount = 30}) => {
   // Multiple animations for different wave parts
-  const [wave1Position] = React.useState(new Animated.Value(0));
-  const [wave2Position] = React.useState(new Animated.Value(0));
-  const [wave3Position] = React.useState(new Animated.Value(0));
-  const [shimmer] = React.useState(new Animated.Value(0));
+  const [wave1Position] = useState(new Animated.Value(0));
+  const [wave2Position] = useState(new Animated.Value(0));
+  const [wave3Position] = useState(new Animated.Value(0));
+  const [shimmer] = useState(new Animated.Value(0));
 
-  React.useEffect(() => {
+  // Fluid simulation state
+  const [fluidPoints, setFluidPoints] = useState<FluidPoint[]>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastUpdateTimeRef = useRef<number>(Date.now());
+  const containerRef = useRef<View>(null);
+  const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
+  const touchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
     // Primary wave animation
     const animateWave1 = () => {
       Animated.sequence([
@@ -84,13 +98,123 @@ export const WaveAnimation: React.FC<Props> = ({style}) => {
     setTimeout(() => animateWave3(), 1000);
     setTimeout(() => animateShimmer(), 1500);
 
+    // Initialize fluid simulation
+    initFluidSimulation();
+
+    // Start animation loop
+    const animate = () => {
+      const now = Date.now();
+      const deltaTime = (now - lastUpdateTimeRef.current) / 1000; // Convert to seconds
+      lastUpdateTimeRef.current = now;
+
+      // Update fluid simulation
+      updateFluidSimulation(deltaTime);
+
+      // Continue animation loop
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    // Add random disturbances to the fluid
+    const disturbanceInterval = setInterval(() => {
+      const x = Math.random() * screenWidth;
+      const y = Math.random() * screenHeight * 0.7 + screenHeight * 0.3; // Bottom 70%
+      fluidSimulation.addDisturbance(x, y, 2 + Math.random() * 3);
+    }, 2000);
+
     return () => {
       wave1Position.stopAnimation();
       wave2Position.stopAnimation();
       wave3Position.stopAnimation();
       shimmer.stopAnimation();
+
+      // Clean up animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      // Clear interval
+      clearInterval(disturbanceInterval);
+
+      // Clear timeout
+      if (touchTimeoutRef.current) {
+        clearTimeout(touchTimeoutRef.current);
+      }
     };
-  }, [wave1Position, wave2Position, wave3Position, shimmer]);
+  }, [wave1Position, wave2Position, wave3Position, shimmer, particleCount]);
+
+  // Initialize fluid simulation
+  const initFluidSimulation = () => {
+    // Configure fluid simulation
+    fluidSimulation.setParameters({
+      gravity: 0.02,
+      damping: 0.99,
+      pressureStrength: 0.2,
+      densityStrength: 0.2,
+      interactionRadius: 60,
+    });
+
+    // Clear existing points
+    fluidSimulation.clear();
+
+    // Add fluid points
+    for (let i = 0; i < 40; i++) {
+      fluidSimulation.addPoint(
+        Math.random() * screenWidth,
+        Math.random() * screenHeight * 0.7 + screenHeight * 0.3, // Bottom 70%
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+      );
+    }
+
+    // Initialize particles
+    particleSystem.clear();
+    const newParticles = particleSystem.createWaterParticles(
+      screenWidth / 2,
+      screenHeight / 2,
+      particleCount,
+      {
+        baseSize: 15,
+        baseVelocity: 30,
+        colors: ['#03A9F4', '#29B6F6', '#4FC3F7', '#81D4FA'],
+      },
+    );
+
+    setParticles(newParticles);
+  };
+
+  // Update fluid simulation
+  const updateFluidSimulation = (deltaTime: number) => {
+    // Update fluid simulation
+    fluidSimulation.update(deltaTime);
+    setFluidPoints([...fluidSimulation.getPoints()]);
+
+    // Update existing particles
+    particleSystem.update(deltaTime * 1000); // Convert to milliseconds
+
+    // Add new particles occasionally
+    if (Math.random() < 0.05) {
+      const x = Math.random() * screenWidth;
+      const y = screenHeight * 0.7 + Math.random() * screenHeight * 0.3; // Bottom 30%
+
+      const newParticles = particleSystem.createWaterParticles(
+        x,
+        y,
+        Math.floor(Math.random() * 2) + 1, // 1-2 particles
+        {
+          baseSize: 10 + Math.random() * 8,
+          baseVelocity: 20 + Math.random() * 20,
+          colors: ['#03A9F4', '#29B6F6', '#4FC3F7', '#81D4FA'],
+        },
+      );
+
+      setParticles(prevParticles => [...prevParticles, ...newParticles]);
+    }
+
+    // Update state with current particles
+    setParticles([...particleSystem.getParticles()]);
+  };
 
   const wave1Style = {
     transform: [
@@ -163,7 +287,38 @@ export const WaveAnimation: React.FC<Props> = ({style}) => {
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      ref={containerRef}
+      style={[styles.container, style]}
+      onTouchStart={e => {
+        // Add disturbance on touch
+        const {locationX, locationY} = e.nativeEvent;
+        fluidSimulation.addDisturbance(locationX, locationY, 8);
+
+        // Add water particles on touch
+        const newParticles = particleSystem.createWaterParticles(
+          locationX,
+          locationY,
+          5,
+          {
+            baseSize: 15,
+            baseVelocity: 40,
+            colors: ['#03A9F4', '#29B6F6', '#4FC3F7', '#81D4FA'],
+          },
+        );
+
+        setParticles(prevParticles => [...prevParticles, ...newParticles]);
+
+        // Clear previous timeout
+        if (touchTimeoutRef.current) {
+          clearTimeout(touchTimeoutRef.current);
+        }
+
+        // Add ripple effect for a short time
+        touchTimeoutRef.current = setTimeout(() => {
+          fluidSimulation.addDisturbance(locationX, locationY, 3);
+        }, 200);
+      }}>
       {/* Background */}
       <View style={styles.background} />
 
@@ -174,6 +329,27 @@ export const WaveAnimation: React.FC<Props> = ({style}) => {
 
       {/* Shimmer effect */}
       <Animated.View style={[styles.shimmer, shimmerStyle]} />
+
+      {/* Fluid points visualization */}
+      {fluidPoints.map((point, index) => (
+        <View
+          key={`fluid_${index}`}
+          style={[
+            styles.fluidPoint,
+            {
+              left: point.x,
+              top: point.y,
+              opacity: 0.1 + point.density * 0.2,
+              transform: [{scale: 0.5 + point.density * 0.5}],
+            },
+          ]}
+        />
+      ))}
+
+      {/* Water particles */}
+      {particles.map(particle => (
+        <WaterParticle key={particle.id} particle={particle} />
+      ))}
     </View>
   );
 };
@@ -217,5 +393,12 @@ const styles = StyleSheet.create({
     right: 0,
     height: '60%',
     backgroundColor: '#BBDEFB', // Very light blue
+  },
+  fluidPoint: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#81D4FA',
   },
 });
