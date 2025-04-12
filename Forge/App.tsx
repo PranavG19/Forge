@@ -12,6 +12,7 @@ import {colors} from './src/theme/colors';
 import {databaseService} from './src/services/storage/DatabaseService';
 import {settingsService} from './src/services/settings/SettingsService';
 import {analyticsService} from './src/services/analytics/AnalyticsService';
+import {experienceService} from './src/services/experience/ExperienceService';
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -37,6 +38,12 @@ const App = () => {
         const onboardingCompleted =
           await settingsService.isOnboardingCompleted();
         setInitialRoute(onboardingCompleted ? 'TodoList' : 'Onboarding');
+
+        // Check for weekly reset
+        if (onboardingCompleted) {
+          await settingsService.checkWeeklyReset();
+          await experienceService.checkAndResetWeeklyExp();
+        }
 
         // Track app open and check retention
         await analyticsService.logAppOpen();

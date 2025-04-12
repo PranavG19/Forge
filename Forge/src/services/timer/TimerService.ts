@@ -29,7 +29,7 @@ export interface TimerStatus {
 
 export class TimerService extends EventEmitter {
   private static instance: TimerService;
-  private timer: NodeJS.Timeout | null = null;
+  private timer: NodeJS.Timeout | {clear: () => void} | null = null;
   private status: TimerStatus = {
     mode: TimerMode.FOCUS,
     state: TimerState.IDLE,
@@ -94,7 +94,11 @@ export class TimerService extends EventEmitter {
     if (this.status.state !== TimerState.RUNNING) return;
 
     if (this.timer) {
-      clearInterval(this.timer);
+      if ('clear' in this.timer) {
+        this.timer.clear();
+      } else {
+        clearInterval(this.timer as NodeJS.Timeout);
+      }
       this.timer = null;
     }
 
@@ -119,14 +123,56 @@ export class TimerService extends EventEmitter {
   }
 
   private startTimer(): void {
-    this.timer = setInterval(() => {
-      if (this.status.timeRemaining > 0) {
-        this.status.timeRemaining--;
-        this.emit('timerTick', this.status);
-      } else {
-        this.handleTimerComplete();
+    // Use requestAnimationFrame for more efficient timer updates
+    // This reduces the update frequency to once per second instead of continuous updates
+    let lastUpdateTime = Date.now();
+    let animationFrameId: number;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const deltaTime = now - lastUpdateTime;
+
+      // Only update once per second
+      if (deltaTime >= 1000) {
+        // Calculate how many seconds have passed (in case of slow devices)
+        const secondsToSubtract = Math.floor(deltaTime / 1000);
+
+        if (this.status.timeRemaining > 0) {
+          // Subtract the elapsed seconds, but ensure we don't go below 0
+          this.status.timeRemaining = Math.max(
+            0,
+            this.status.timeRemaining - secondsToSubtract,
+          );
+          this.emit('timerTick', this.status);
+
+          // Update the last update time
+          lastUpdateTime = now - (deltaTime % 1000); // Account for remainder
+        }
+
+        // If timer has completed
+        if (this.status.timeRemaining <= 0) {
+          this.handleTimerComplete();
+          return; // Stop the animation frame loop
+        }
       }
-    }, 1000);
+
+      // Continue the loop if timer is still running
+      if (this.status.state === TimerState.RUNNING) {
+        animationFrameId = requestAnimationFrame(updateTimer);
+      }
+    };
+
+    // Start the animation frame loop
+    animationFrameId = requestAnimationFrame(updateTimer);
+
+    // Store the animation frame ID for cleanup
+    this.timer = {
+      clear: () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      },
+    } as any;
   }
 
   private async handleTimerComplete(): Promise<void> {
@@ -148,7 +194,11 @@ export class TimerService extends EventEmitter {
 
   private cleanup(): void {
     if (this.timer) {
-      clearInterval(this.timer);
+      if ('clear' in this.timer) {
+        this.timer.clear();
+      } else {
+        clearInterval(this.timer as NodeJS.Timeout);
+      }
       this.timer = null;
     }
   }

@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   SectionList,
+  Switch,
 } from 'react-native';
 import {TaskCard} from '../../components/task/TaskCard';
 import {DailyNorthStarModal} from '../../components/modals/DailyNorthStarModal';
 import {IntentionsHeader} from '../../components/intention/IntentionsHeader';
+import {CalendarEvents} from '../../components/calendar/CalendarEvents';
 import {Task, TaskCategory, TaskStatus} from '../../models/Task';
 import {taskService} from '../../services/task/TaskService';
 import {intentionService} from '../../services/intention/IntentionService';
@@ -38,6 +40,7 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNorthStarModal, setShowNorthStarModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Check for daily North Star on mount and category change
   useEffect(() => {
@@ -185,6 +188,20 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
 
       {/* Intentions Header */}
       <IntentionsHeader onSetNorthStar={() => setShowNorthStarModal(true)} />
+
+      {/* Calendar Integration Toggle */}
+      <View style={styles.calendarToggleContainer}>
+        <Text style={styles.calendarToggleText}>Show Calendar Events</Text>
+        <Switch
+          value={showCalendar}
+          onValueChange={setShowCalendar}
+          trackColor={{false: colors.surface, true: colors.primary}}
+          thumbColor={colors.text.primary}
+        />
+      </View>
+
+      {/* Calendar Events */}
+      {showCalendar && <CalendarEvents />}
 
       {/* Category Tabs */}
       <View style={styles.categoryTabs}>
@@ -345,5 +362,18 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: spacing.md,
     fontWeight: 'bold',
+  },
+  calendarToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.container.padding,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  calendarToggleText: {
+    color: colors.text.primary,
+    fontSize: spacing.sm,
   },
 });

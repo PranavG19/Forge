@@ -75,9 +75,27 @@ export class DatabaseService {
       )
     `;
 
+    // Create indexes for performance optimization
+    const createIndexes = [
+      // Tasks indexes
+      `CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks (category)`,
+      `CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks (priority)`,
+      `CREATE INDEX IF NOT EXISTS idx_tasks_createdAt ON tasks (createdAt)`,
+
+      // Subtasks indexes
+      `CREATE INDEX IF NOT EXISTS idx_subtasks_parentId ON subtasks (parentId)`,
+      `CREATE INDEX IF NOT EXISTS idx_subtasks_status ON subtasks (status)`,
+    ];
+
     try {
       await this.executeSql(createTasksTable);
       await this.executeSql(createSubtasksTable);
+
+      // Create all indexes
+      for (const indexQuery of createIndexes) {
+        await this.executeSql(indexQuery);
+      }
     } catch (error) {
       console.error('Error creating tables:', error);
       throw error;
