@@ -13,6 +13,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../../App';
 import {intentionService} from '../../services/intention/IntentionService';
 import {settingsService} from '../../services/settings/SettingsService';
+import {analyticsService} from '../../services/analytics/AnalyticsService';
 import {colors} from '../../theme/colors';
 import {spacing} from '../../theme/spacing';
 
@@ -81,6 +82,7 @@ export const OnboardingScreen: React.FC<Props> = ({navigation}) => {
 
     try {
       await intentionService.setDailyNorthStar(dailyNorthStar.trim());
+      await analyticsService.logNorthStarSet();
       setStep(2);
     } catch (err) {
       console.error('Error setting daily North Star:', err);
@@ -111,6 +113,7 @@ export const OnboardingScreen: React.FC<Props> = ({navigation}) => {
       }));
 
       await intentionService.setWeeklyIntentions(formattedIntentions);
+      await analyticsService.logNorthStarSet();
       setStep(3);
     } catch (err) {
       console.error('Error setting weekly intentions:', err);

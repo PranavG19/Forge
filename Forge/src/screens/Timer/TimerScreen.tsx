@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
+  Vibration,
   SafeAreaView,
+  ScrollView,
 } from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../../App';
+import Sound from 'react-native-sound';
 import {
   timerService,
   TimerService,
@@ -17,9 +19,12 @@ import {
   TimerStatus,
 } from '../../services/timer/TimerService';
 import {taskService} from '../../services/task/TaskService';
+import {appBlocker} from '../../services/blocking/AppBlocker';
 import {Task} from '../../models/Task';
 import {colors} from '../../theme/colors';
 import {spacing} from '../../theme/spacing';
+import {FlameAnimation} from '../../components/animation/FlameAnimation';
+import {WaveAnimation} from '../../components/animation/WaveAnimation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Timer'>;
 
@@ -29,7 +34,38 @@ export const TimerScreen: React.FC<Props> = ({route, navigation}) => {
   const [timerStatus, setTimerStatus] = useState<TimerStatus>(
     timerService.getStatus(),
   );
-  const [animation] = useState(new Animated.Value(0));
+  const [selectedPreset, setSelectedPreset] = useState<number>(0);
+  const [customDuration, setCustomDuration] = useState<number>(25);
+  const [customRestDuration, setCustomRestDuration] = useState<number>(5);
+
+  // Timer presets in minutes [focus, rest]
+  const TIMER_PRESETS = [
+    [25, 5],
+    [90, 30],
+    [50, 10],
+  ];
+
+  // Initialize app blocking
+  useEffect(() => {
+    appBlocker.initialize().catch(error => {
+      console.error('Failed to initialize app blocking:', error);
+    });
+  }, []);
+
+  // Sound setup
+  useEffect(() => {
+    Sound.setCategory('Playback');
+    const chime = new Sound(
+      'chime.mp3',
+      (error: Error | null) => {
+        if (error) {
+          console.error('Failed to load sound', error);
+        }
+      },
+      {mainBundle: true},
+    );
+    return () => chime.release();
+  }, []);
 
   // Load task details
   useEffect(() => {
@@ -62,34 +98,55 @@ export const TimerScreen: React.FC<Props> = ({route, navigation}) => {
     };
   }, []);
 
-  // Background animation
+  // Handle timer completion
   useEffect(() => {
-    const animate = () => {
-      Animated.sequence([
-        Animated.timing(animation, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animation, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ]).start(() => animate());
-    };
+    if (timerStatus.state === TimerState.COMPLETED) {
+      // Play chime
+      const chime = new Sound(
+        'chime.mp3',
+        (error: Error | null) => {
+          if (!error) {
+            chime.play(() => chime.release());
+          }
+        },
+        {mainBundle: true},
+      );
 
-    animate();
-  }, [animation]);
+      // Vibrate
+      Vibration.vibrate([0, 500]);
+    }
+  }, [timerStatus.state]);
 
-  const handleStartFocus = useCallback(() => {
+  const handleStartFocus = useCallback(async () => {
     if (!taskId) return;
-    timerService.startFocus(taskId);
-  }, [taskId]);
+    const duration =
+      selectedPreset === TIMER_PRESETS.length
+        ? customDuration
+        : TIMER_PRESETS[selectedPreset][0];
 
-  const handleStartRest = useCallback(() => {
-    timerService.startRest();
-  }, []);
+    try {
+      await appBlocker.enableFocusMode();
+      timerService.startFocus(taskId, duration * 60); // Convert to seconds
+      Vibration.vibrate([0, 200]); // Short vibration on start
+    } catch (error) {
+      console.error('Failed to enable focus mode:', error);
+    }
+  }, [taskId, selectedPreset, customDuration]);
+
+  const handleStartRest = useCallback(async () => {
+    const duration =
+      selectedPreset === TIMER_PRESETS.length
+        ? customRestDuration
+        : TIMER_PRESETS[selectedPreset][1];
+
+    try {
+      await appBlocker.enableRestMode();
+      timerService.startRest(duration * 60); // Convert to seconds
+      Vibration.vibrate([0, 200]); // Short vibration on start
+    } catch (error) {
+      console.error('Failed to enable rest mode:', error);
+    }
+  }, [selectedPreset, customRestDuration]);
 
   const handlePauseResume = useCallback(() => {
     if (timerStatus.state === TimerState.RUNNING) {
@@ -99,8 +156,13 @@ export const TimerScreen: React.FC<Props> = ({route, navigation}) => {
     }
   }, [timerStatus.state]);
 
-  const handleStop = useCallback(() => {
-    timerService.stop();
+  const handleStop = useCallback(async () => {
+    try {
+      await appBlocker.disableBlocking();
+      timerService.stop();
+    } catch (error) {
+      console.error('Failed to disable blocking:', error);
+    }
   }, []);
 
   const renderControls = () => {
@@ -139,24 +201,41 @@ export const TimerScreen: React.FC<Props> = ({route, navigation}) => {
     );
   };
 
-  const backgroundStyle = {
-    backgroundColor:
-      timerStatus.mode === TimerMode.FOCUS
-        ? colors.timer.focus.background
-        : colors.timer.rest.background,
-    transform: [
-      {
-        scale: animation.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 1.05],
-        }),
-      },
-    ],
-  };
+  const renderPresets = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.presetContainer}>
+      {TIMER_PRESETS.map(([focus, rest], index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.presetButton,
+            selectedPreset === index && styles.presetButtonSelected,
+          ]}
+          onPress={() => setSelectedPreset(index)}>
+          <Text style={styles.presetText}>{`${focus}/${rest}`}</Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity
+        style={[
+          styles.presetButton,
+          selectedPreset === TIMER_PRESETS.length &&
+            styles.presetButtonSelected,
+        ]}
+        onPress={() => setSelectedPreset(TIMER_PRESETS.length)}>
+        <Text style={styles.presetText}>Custom</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View style={[styles.background, backgroundStyle]} />
+      {timerStatus.mode === TimerMode.FOCUS ? (
+        <FlameAnimation style={styles.background} />
+      ) : (
+        <WaveAnimation style={styles.background} />
+      )}
       <View style={styles.content}>
         <Text style={styles.modeText}>
           {timerStatus.mode === TimerMode.FOCUS ? 'Focus Time' : 'Rest Time'}
@@ -170,6 +249,7 @@ export const TimerScreen: React.FC<Props> = ({route, navigation}) => {
           {TimerService.formatTime(timerStatus.timeRemaining)}
         </Text>
 
+        {timerStatus.state === TimerState.IDLE && renderPresets()}
         {renderControls()}
       </View>
     </SafeAreaView>
@@ -235,5 +315,27 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: colors.status.error,
+  },
+  presetContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  presetButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.borderRadius.md,
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.xs,
+    minWidth: 80,
+  },
+  presetButtonSelected: {
+    backgroundColor: colors.primary,
+  },
+  presetText: {
+    color: colors.text.primary,
+    fontSize: spacing.sm,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

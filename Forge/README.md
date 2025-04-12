@@ -1,97 +1,125 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Monk Mode: Forge
 
-# Getting Started
+A mobile app designed for individuals in "Monk Mode"—a protocol of extreme focus and discipline, committing 100% to their goals. Forge bridges the gap between **agency** (the power to act decisively) and **intentionality** (clarity of purpose) with a brutal, honest approach.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Features
 
-## Step 1: Start Metro
+### 1. Intention-Setting
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- Daily "North Star" intention setting (one win for the day)
+- Weekly intentions (3 goals, 1 North Star)
+- Cycling suggestions for quick inspiration
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### 2. Task Management
+
+- Priority-based to-do list organized by Today, Next, and Later
+- North Star task highlighting
+- Subtasks with progress tracking
+- Task details with notes and time estimates
+
+### 3. Focus Timer
+
+- Task-linked timer with Focus and Rest modes
+- Stunning visuals: fire animation (Focus) and water animation (Rest)
+- Customizable timer presets (25/5, 90/30, 50/10)
+- App blocking to eliminate distractions
+
+### 4. Profile & Analytics
+
+- Weekly stats (Focus hours, Rest hours, Distraction breaches)
+- Task completion tracking
+- Experience system with level progression
+- Settings for customization
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16+
+- React Native development environment
+- iOS: XCode 13+ (Mac only)
+- Android: Android Studio with SDK 30+
+
+### Installation
+
+1. Clone the repository
 
 ```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+git clone https://github.com/yourusername/forge.git
+cd forge
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+2. Install dependencies
 
 ```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+npm install
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+3. iOS Setup (Mac only)
 
 ```sh
 bundle install
+bundle exec pod install --project-directory=ios
 ```
 
-Then, and every time you update your native dependencies, run:
+4. Run the app
 
 ```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# iOS
 npm run ios
 
-# OR using Yarn
-yarn ios
+# Android
+npm run android
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## App Structure
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+- `src/components/`: Reusable UI components
+- `src/screens/`: Main app screens
+- `src/services/`: Business logic and data services
+- `src/models/`: Data models and types
+- `src/theme/`: UI theme configuration
 
-## Step 3: Modify your app
+## Key Services
 
-Now that you have successfully run the app, let's make changes!
+- **IntentionService**: Manages daily and weekly intentions
+- **TaskService**: Handles task CRUD operations
+- **TimerService**: Controls focus/rest timers
+- **AppBlockingService**: Manages app blocking during focus sessions
+- **ExperienceService**: Tracks user progress and experience
+- **AnalyticsService**: Collects usage metrics
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## Development
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### Running Tests
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+```sh
+npm test
+```
 
-## Congratulations! :tada:
+### Building for Production
 
-You've successfully run and modified your React Native App. :partying_face:
+```sh
+# iOS
+npm run build:ios
 
-### Now what?
+# Android
+npm run build:android
+```
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+## Design Philosophy
 
-# Troubleshooting
+Forge follows a "brutal, focused, minimalistic" design ethos:
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+- **Black base** with orange (North Star) and grey (regular tasks)
+- **Fire animation** for Focus mode
+- **Water animation** for Rest mode
+- **Minimal UI** with only essential elements
 
-# Learn More
+## License
 
-To learn more about React Native, take a look at the following resources:
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+---
+
+_"This is your vow. Forge it."_

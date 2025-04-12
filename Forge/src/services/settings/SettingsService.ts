@@ -1,3 +1,4 @@
+import {EventEmitter} from 'events';
 import {databaseService} from '../storage/DatabaseService';
 import {experienceService} from '../experience/ExperienceService';
 import {intentionService} from '../intention/IntentionService';
@@ -12,16 +13,6 @@ export interface AppSettings {
   lastResetDate?: string;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
-  onboardingCompleted: false,
-  soundEnabled: true,
-  hapticsEnabled: true,
-  weeklyResetDay: 'SUNDAY',
-  focusTimerPresets: [25, 50, 90], // in minutes
-  restTimerPresets: [5, 10, 30], // in minutes
-  lastResetDate: new Date().toISOString(),
-};
-
 const DAYS_OF_WEEK = [
   'SUNDAY',
   'MONDAY',
@@ -32,12 +23,24 @@ const DAYS_OF_WEEK = [
   'SATURDAY',
 ];
 
-export class SettingsService {
+export class SettingsService extends EventEmitter {
   private static instance: SettingsService;
   private initialized = false;
-  private settings: AppSettings = {...DEFAULT_SETTINGS};
+  private settings: AppSettings;
+
+  private static readonly DEFAULT_SETTINGS: AppSettings = {
+    onboardingCompleted: false,
+    soundEnabled: true,
+    hapticsEnabled: true,
+    weeklyResetDay: 'SUNDAY',
+    focusTimerPresets: [25, 50, 90], // in minutes
+    restTimerPresets: [5, 10, 30], // in minutes
+    lastResetDate: new Date().toISOString(),
+  };
 
   private constructor() {
+    super();
+    this.settings = {...SettingsService.DEFAULT_SETTINGS};
     this.initializeDatabase().catch(console.error);
   }
 
@@ -59,16 +62,13 @@ export class SettingsService {
         )
       `);
 
-      // Load existing settings
-      const [result] = await databaseService.executeSql(
-        'SELECT key, value FROM settings',
-      );
-
-      // Convert stored settings to in-memory settings
-      for (let i = 0; i < result.rows.length; i++) {
-        const row = result.rows.item(i);
-        const value = JSON.parse(row.value);
-        this.settings = {...this.settings, [row.key]: value};
+      // Initialize default settings if not set
+      const defaultSettings = SettingsService.DEFAULT_SETTINGS;
+      for (const [key, value] of Object.entries(defaultSettings)) {
+        await databaseService.executeSql(
+          `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`,
+          [key, JSON.stringify(value)],
+        );
       }
 
       this.initialized = true;
@@ -76,6 +76,24 @@ export class SettingsService {
       console.error('Failed to initialize settings database:', error);
       throw error;
     }
+  }
+
+  async getSoundEnabled(): Promise<boolean> {
+    return this.getSetting('soundEnabled');
+  }
+
+  async getHapticsEnabled(): Promise<boolean> {
+    return this.getSetting('hapticsEnabled');
+  }
+
+  async toggleSound(enabled: boolean): Promise<void> {
+    await this.setSetting('soundEnabled', enabled);
+    this.emit('soundToggled', enabled);
+  }
+
+  async toggleHaptics(enabled: boolean): Promise<void> {
+    await this.setSetting('hapticsEnabled', enabled);
+    this.emit('hapticsToggled', enabled);
   }
 
   private async setSetting<K extends keyof AppSettings>(

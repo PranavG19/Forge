@@ -7,15 +7,18 @@ import {TodoListScreen} from './src/screens/TodoList/TodoListScreen';
 import {TaskDetailsScreen} from './src/screens/TaskDetails/TaskDetailsScreen';
 import {TimerScreen} from './src/screens/Timer/TimerScreen';
 import {OnboardingScreen} from './src/screens/Onboarding/OnboardingScreen';
+import {ProfileScreen} from './src/screens/Profile/ProfileScreen';
 import {colors} from './src/theme/colors';
 import {databaseService} from './src/services/storage/DatabaseService';
 import {settingsService} from './src/services/settings/SettingsService';
+import {analyticsService} from './src/services/analytics/AnalyticsService';
 
 export type RootStackParamList = {
   Onboarding: undefined;
   TodoList: undefined;
   TaskDetails: {taskId: string};
   Timer: {taskId: string};
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,6 +37,11 @@ const App = () => {
         const onboardingCompleted =
           await settingsService.isOnboardingCompleted();
         setInitialRoute(onboardingCompleted ? 'TodoList' : 'Onboarding');
+
+        // Track app open and check retention
+        await analyticsService.logAppOpen();
+        await analyticsService.logRetention();
+
         setIsLoading(false);
       } catch (err) {
         console.error('Failed to initialize database:', err);
@@ -101,6 +109,18 @@ const App = () => {
           options={{
             headerShown: true,
             headerTitle: 'Task Details',
+            headerStyle: {
+              backgroundColor: colors.background,
+            },
+            headerTintColor: colors.text.primary,
+          }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            headerShown: true,
+            headerTitle: 'Profile',
             headerStyle: {
               backgroundColor: colors.background,
             },

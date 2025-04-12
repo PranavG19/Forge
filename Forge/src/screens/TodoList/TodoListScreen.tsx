@@ -8,10 +8,11 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  SectionList,
 } from 'react-native';
 import {TaskCard} from '../../components/task/TaskCard';
 import {DailyNorthStarModal} from '../../components/modals/DailyNorthStarModal';
-import {ExperienceBar} from '../../components/experience/ExperienceBar';
+import {IntentionsHeader} from '../../components/intention/IntentionsHeader';
 import {Task, TaskCategory, TaskStatus} from '../../models/Task';
 import {taskService} from '../../services/task/TaskService';
 import {intentionService} from '../../services/intention/IntentionService';
@@ -22,11 +23,17 @@ import {RootStackParamList} from '../../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TodoList'>;
 
+interface TaskSection {
+  title: string;
+  data: Task[];
+  category: TaskCategory;
+}
+
 export const TodoListScreen: React.FC<Props> = ({navigation}) => {
   const [selectedCategory, setSelectedCategory] = useState<TaskCategory>(
     TaskCategory.TODAY,
   );
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskSections, setTaskSections] = useState<TaskSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +76,37 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
     setError(null);
 
     try {
-      const loadedTasks = await taskService.getTasksByCategory(
-        selectedCategory,
-      );
-      setTasks(loadedTasks);
+      // Load tasks for all categories
+      const [todayTasks, nextTasks, laterTasks] = await Promise.all([
+        taskService.getTasksByCategory(TaskCategory.TODAY),
+        taskService.getTasksByCategory(TaskCategory.NEXT),
+        taskService.getTasksByCategory(TaskCategory.LATER),
+      ]);
+
+      // Create sections based on selected category
+      const sections: TaskSection[] = [];
+
+      if (selectedCategory === TaskCategory.TODAY) {
+        sections.push({
+          title: 'TODAY',
+          data: todayTasks,
+          category: TaskCategory.TODAY,
+        });
+      } else if (selectedCategory === TaskCategory.NEXT) {
+        sections.push({
+          title: 'NEXT',
+          data: nextTasks,
+          category: TaskCategory.NEXT,
+        });
+      } else if (selectedCategory === TaskCategory.LATER) {
+        sections.push({
+          title: 'LATER',
+          data: laterTasks,
+          category: TaskCategory.LATER,
+        });
+      }
+
+      setTaskSections(sections);
     } catch (error) {
       console.error('Error loading tasks:', error);
       setError('Failed to load tasks. Please try again.');
@@ -136,14 +170,23 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
           loadTasks();
         }}
       />
+
+      {/* Header with Profile Button */}
       <View style={styles.header}>
-        <ExperienceBar />
-        <ExperienceBar />
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Tasks</Text>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}>
+            <Text style={styles.profileButtonText}>Profile</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
+      {/* Intentions Header */}
+      <IntentionsHeader onSetNorthStar={() => setShowNorthStarModal(true)} />
+
+      {/* Category Tabs */}
       <View style={styles.categoryTabs}>
         {Object.values(TaskCategory).map(category =>
           renderCategoryTab(category),
@@ -161,8 +204,8 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={tasks}
+        <SectionList
+          sections={taskSections}
           keyExtractor={item => item.id}
           renderItem={({item}) => (
             <TaskCard
@@ -174,9 +217,17 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
               }}
             />
           )}
+          renderSectionHeader={({section}) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            </View>
+          )}
           contentContainerStyle={[
             styles.listContent,
-            tasks.length === 0 && styles.emptyListContent,
+            taskSections.length === 0 ||
+            (taskSections.length === 1 && taskSections[0].data.length === 0)
+              ? styles.emptyListContent
+              : null,
           ]}
           ListEmptyComponent={renderEmptyList}
           refreshControl={
@@ -186,6 +237,7 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
               tintColor={colors.primary}
             />
           }
+          stickySectionHeadersEnabled={true}
         />
       )}
     </SafeAreaView>
@@ -202,6 +254,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.default,
   },
   titleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: spacing.container.padding,
   },
   title: {
@@ -237,6 +292,18 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: spacing.sm,
   },
+  sectionHeader: {
+    backgroundColor: colors.background,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.container.padding,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  sectionHeaderText: {
+    color: colors.text.secondary,
+    fontSize: spacing.md,
+    fontWeight: 'bold',
+  },
   emptyListContent: {
     flexGrow: 1,
   },
@@ -267,5 +334,16 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: spacing.md,
     textAlign: 'center',
+  },
+  profileButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.borderRadius.md,
+    backgroundColor: colors.primary,
+  },
+  profileButtonText: {
+    color: colors.text.primary,
+    fontSize: spacing.md,
+    fontWeight: 'bold',
   },
 });
