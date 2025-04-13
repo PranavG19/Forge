@@ -9,16 +9,43 @@ export enum SoundType {
   LEVEL_UP = 'level_up',
 }
 
+// Modified to allow undefined values for missing sound files
 type SoundAssets = {
-  [key in SoundType]: number;
+  [key in SoundType]?: number;
 };
 
-const soundAssets: SoundAssets = {
-  [SoundType.TIMER_START]: require('../../assets/sounds/timer-start.mp3'),
-  [SoundType.TIMER_END]: require('../../assets/sounds/timer-end.mp3'),
-  [SoundType.TASK_COMPLETE]: require('../../assets/sounds/task-complete.mp3'),
-  [SoundType.LEVEL_UP]: require('../../assets/sounds/level-up.mp3'),
-};
+// Use a try-catch block to handle missing sound files
+const soundAssets: SoundAssets = {};
+try {
+  // Attempt to load sound assets if they exist
+  soundAssets[
+    SoundType.TIMER_START
+  ] = require('../../assets/sounds/timer-start.mp3');
+} catch (e) {
+  console.warn('Missing sound file: timer-start.mp3');
+}
+
+try {
+  soundAssets[
+    SoundType.TIMER_END
+  ] = require('../../assets/sounds/timer-end.mp3');
+} catch (e) {
+  console.warn('Missing sound file: timer-end.mp3');
+}
+
+try {
+  soundAssets[
+    SoundType.TASK_COMPLETE
+  ] = require('../../assets/sounds/task-complete.mp3');
+} catch (e) {
+  console.warn('Missing sound file: task-complete.mp3');
+}
+
+try {
+  soundAssets[SoundType.LEVEL_UP] = require('../../assets/sounds/level-up.mp3');
+} catch (e) {
+  console.warn('Missing sound file: level-up.mp3');
+}
 
 export class FeedbackService {
   private static instance: FeedbackService;
@@ -42,14 +69,20 @@ export class FeedbackService {
     Sound.setCategory('Playback');
 
     try {
-      // Initialize all sounds
+      // Initialize all sounds that were successfully loaded
       for (const [type, asset] of Object.entries(soundAssets)) {
-        const sound = new Sound(asset, (error: Error | null) => {
-          if (error) {
-            console.error(`Error loading sound ${type}:`, error);
+        if (asset) {
+          try {
+            const sound = new Sound(asset, (error: Error | null) => {
+              if (error) {
+                console.error(`Error loading sound ${type}:`, error);
+              }
+            });
+            this.sounds.set(type as SoundType, sound);
+          } catch (e) {
+            console.error(`Failed to initialize sound ${type}:`, e);
           }
-        });
-        this.sounds.set(type as SoundType, sound);
+        }
       }
 
       this.initialized = true;
@@ -65,7 +98,8 @@ export class FeedbackService {
 
     const sound = this.sounds.get(type);
     if (!sound) {
-      console.error(`Sound ${type} not found`);
+      // Just return silently if the sound doesn't exist
+      // This allows the app to function without the sound files
       return;
     }
 

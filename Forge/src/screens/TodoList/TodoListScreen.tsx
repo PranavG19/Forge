@@ -205,9 +205,11 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
 
       {/* Category Tabs */}
       <View style={styles.categoryTabs}>
-        {Object.values(TaskCategory).map(category =>
-          renderCategoryTab(category),
-        )}
+        {Object.values(TaskCategory).map(category => (
+          <React.Fragment key={category}>
+            {renderCategoryTab(category)}
+          </React.Fragment>
+        ))}
       </View>
 
       {error && (

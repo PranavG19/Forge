@@ -51,8 +51,10 @@ export class AndroidBlockingAdapter implements BlockingServiceInterface {
   readonly hasPermission: boolean;
 
   constructor() {
-    // Access private properties safely
-    this.eventEmitter = new NativeEventEmitter();
+    // Create a dummy event emitter using DeviceEventEmitter instead of NativeEventEmitter
+    // since we don't have a native module to pass to NativeEventEmitter
+    const {DeviceEventEmitter} = require('react-native');
+    this.eventEmitter = DeviceEventEmitter;
     this.hasPermission = (this.service as any).hasPermission || false;
   }
 

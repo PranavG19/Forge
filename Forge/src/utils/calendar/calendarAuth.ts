@@ -1,7 +1,25 @@
-import {authorize, refresh, AuthConfiguration} from 'react-native-app-auth';
 import {Platform} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Define AuthConfiguration type
+interface AuthConfiguration {
+  issuer: string;
+  clientId: string;
+  redirectUrl: string;
+  scopes: string[];
+  serviceConfiguration: {
+    authorizationEndpoint: string;
+    tokenEndpoint: string;
+  };
+}
+
+// Import react-native-app-auth safely with error handling
+let appAuth: any = null;
+try {
+  appAuth = require('react-native-app-auth');
+} catch (error) {
+  console.warn('react-native-app-auth is not available:', error);
+}
 // Storage keys
 const AUTH_TOKEN_KEY = 'google_calendar_auth_token';
 const REFRESH_TOKEN_KEY = 'google_calendar_refresh_token';
@@ -36,8 +54,16 @@ const getConfig = (): AuthConfiguration => {
  */
 export const authenticateWithGoogle = async (): Promise<boolean> => {
   try {
+    // Check if appAuth is available
+    if (!appAuth || !appAuth.authorize) {
+      console.error(
+        'react-native-app-auth is not properly installed or configured',
+      );
+      return false;
+    }
+
     const config = getConfig();
-    const result = await authorize(config);
+    const result = await appAuth.authorize(config);
 
     // Store authentication result
     await AsyncStorage.setItem(AUTH_TOKEN_KEY, result.accessToken);
@@ -75,8 +101,16 @@ export const getAccessToken = async (): Promise<string | null> => {
     // If token is expired and we have a refresh token, refresh it
     if (now >= expiry && refreshToken) {
       try {
+        // Check if appAuth is available
+        if (!appAuth || !appAuth.refresh) {
+          console.error(
+            'react-native-app-auth is not properly installed or configured',
+          );
+          return null;
+        }
+
         const config = getConfig();
-        const result = await refresh(config, {
+        const result = await appAuth.refresh(config, {
           refreshToken,
         });
 

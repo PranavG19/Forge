@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Switch} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   appBlockingService,
   BlockMode,
@@ -11,22 +12,25 @@ interface BlockingConfigProps {
   mode: 'Focus' | 'Rest';
 }
 
-// Using localStorage for settings that aren't part of the main settings service
-const getLocalSetting = (key: string, defaultValue: string): string => {
+// Using AsyncStorage for settings that aren't part of the main settings service
+const getLocalSetting = async (
+  key: string,
+  defaultValue: string,
+): Promise<string> => {
   try {
-    const value = localStorage.getItem(key);
+    const value = await AsyncStorage.getItem(key);
     return value !== null ? value : defaultValue;
   } catch (e) {
-    console.error('Error accessing localStorage:', e);
+    console.error('Error accessing AsyncStorage:', e);
     return defaultValue;
   }
 };
 
-const setLocalSetting = (key: string, value: string): void => {
+const setLocalSetting = async (key: string, value: string): Promise<void> => {
   try {
-    localStorage.setItem(key, value);
+    await AsyncStorage.setItem(key, value);
   } catch (e) {
-    console.error('Error setting localStorage:', e);
+    console.error('Error setting AsyncStorage:', e);
   }
 };
 
@@ -115,17 +119,17 @@ const BlockingConfig: React.FC<BlockingConfigProps> = ({mode}) => {
       const hasPermission = await platformBlockingService.initialize();
       setInitialized(hasPermission);
 
-      // Load saved settings from localStorage
+      // Load saved settings from AsyncStorage
       const blockingModeKey = `${mode.toLowerCase()}BlockingMode`;
-      const savedMode = getLocalSetting(blockingModeKey, 'FULL');
+      const savedMode = await getLocalSetting(blockingModeKey, 'FULL');
       setBlockingMode(savedMode as BlockMode);
 
       const timerDurationKey = `${mode.toLowerCase()}TimerDuration`;
-      const savedDuration = getLocalSetting(timerDurationKey, '30');
+      const savedDuration = await getLocalSetting(timerDurationKey, '30');
       setTimerDuration(Number(savedDuration));
 
       const enabledKey = `${mode.toLowerCase()}BlockingEnabled`;
-      const savedEnabled = getLocalSetting(enabledKey, 'true');
+      const savedEnabled = await getLocalSetting(enabledKey, 'true');
       setIsEnabled(savedEnabled !== 'false');
     };
 
@@ -135,19 +139,19 @@ const BlockingConfig: React.FC<BlockingConfigProps> = ({mode}) => {
   const handleModeChange = (newMode: BlockMode) => {
     setBlockingMode(newMode);
     const key = `${mode.toLowerCase()}BlockingMode`;
-    setLocalSetting(key, newMode);
+    setLocalSetting(key, newMode).catch(console.error);
   };
 
   const handleTimerDurationChange = (value: number) => {
     setTimerDuration(value);
     const key = `${mode.toLowerCase()}TimerDuration`;
-    setLocalSetting(key, String(value));
+    setLocalSetting(key, String(value)).catch(console.error);
   };
 
   const handleToggleEnabled = (value: boolean) => {
     setIsEnabled(value);
     const key = `${mode.toLowerCase()}BlockingEnabled`;
-    setLocalSetting(key, String(value));
+    setLocalSetting(key, String(value)).catch(console.error);
   };
 
   if (!initialized) {

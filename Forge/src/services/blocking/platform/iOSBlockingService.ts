@@ -1,4 +1,8 @@
-import {NativeModules, NativeEventEmitter} from 'react-native';
+import {
+  NativeModules,
+  NativeEventEmitter,
+  DeviceEventEmitter,
+} from 'react-native';
 import {BlockingServiceInterface} from './BlockingServiceInterface';
 
 // This would be implemented as a native module in Swift
@@ -17,7 +21,16 @@ class IOSBlockingService implements BlockingServiceInterface {
   private _eventEmitter: NativeEventEmitter;
 
   private constructor() {
-    this.eventEmitter = new NativeEventEmitter(ScreenTimeManager);
+    // Check if ScreenTimeManager exists before creating NativeEventEmitter
+    if (ScreenTimeManager) {
+      this._eventEmitter = new NativeEventEmitter(ScreenTimeManager);
+    } else {
+      // Use DeviceEventEmitter as a fallback if ScreenTimeManager is not available
+      console.warn(
+        'ScreenTimeManager native module not found, using DeviceEventEmitter as fallback',
+      );
+      this._eventEmitter = DeviceEventEmitter as any;
+    }
     this.setupListeners();
   }
 
@@ -28,7 +41,7 @@ class IOSBlockingService implements BlockingServiceInterface {
     return IOSBlockingService.instance;
   }
 
-  private setupListeners(): void {
+  setupListeners(): void {
     this.eventEmitter.addListener(
       'appBlockingStateChanged',
       ({bundleId, isBlocked}) => {

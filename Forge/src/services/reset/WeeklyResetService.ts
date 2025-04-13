@@ -1,8 +1,12 @@
 import {EventEmitter} from 'events';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {settingsService} from '../settings/SettingsService';
 import {experienceService} from '../experience/ExperienceService';
 import {intentionService} from '../intention/IntentionService';
 import {databaseService} from '../storage/DatabaseService';
+
+// Storage keys
+const LAST_RESET_DATE_KEY = 'lastResetDate';
 
 /**
  * Service responsible for managing weekly resets in the app
@@ -170,9 +174,9 @@ export class WeeklyResetService extends EventEmitter {
    */
   private async updateLastResetDate(): Promise<void> {
     const today = new Date();
-    // Store the last reset date in local storage since we can't use the private setSetting method
+    // Store the last reset date in AsyncStorage since we can't use the private setSetting method
     try {
-      localStorage.setItem('lastResetDate', today.toISOString());
+      await AsyncStorage.setItem(LAST_RESET_DATE_KEY, today.toISOString());
       this.lastCheckedDate = today;
     } catch (error) {
       console.error('Error updating last reset date:', error);
@@ -188,8 +192,8 @@ export class WeeklyResetService extends EventEmitter {
     }
 
     try {
-      // Get from localStorage instead of settings service
-      const lastResetDateStr = localStorage.getItem('lastResetDate');
+      // Get from AsyncStorage instead of settings service
+      const lastResetDateStr = await AsyncStorage.getItem(LAST_RESET_DATE_KEY);
       if (!lastResetDateStr) {
         return null;
       }

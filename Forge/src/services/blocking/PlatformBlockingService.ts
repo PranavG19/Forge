@@ -1,4 +1,4 @@
-import {Platform, NativeEventEmitter} from 'react-native';
+import {Platform, NativeEventEmitter, DeviceEventEmitter} from 'react-native';
 import {BlockingServiceInterface} from './platform/BlockingServiceInterface';
 import {iOSAdapter, androidAdapter} from './platform/BlockingServiceAdapter';
 import {appBlockingService, BlockMode, BlockedApp} from './AppBlockingService';
@@ -27,7 +27,7 @@ class PlatformBlockingService {
       blockApp: async () => {},
       unblockApp: async () => {},
       isAppBlocked: async () => false,
-      eventEmitter: new NativeEventEmitter(),
+      eventEmitter: DeviceEventEmitter, // Use DeviceEventEmitter instead of NativeEventEmitter
       setupListeners: () => {},
     };
   }
