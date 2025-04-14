@@ -15,7 +15,7 @@ import {TaskCard} from '../../components/task/TaskCard';
 import {DailyNorthStarModal} from '../../components/modals/DailyNorthStarModal';
 import {IntentionsHeader} from '../../components/intention/IntentionsHeader';
 import {CalendarEvents} from '../../components/calendar/CalendarEvents';
-import {Task, TaskCategory, TaskStatus} from '../../models/Task';
+import {Task, TaskCategory, TaskStatus, TaskPriority} from '../../models/Task';
 import {taskService} from '../../services/task/TaskService';
 import {intentionService} from '../../services/intention/IntentionService';
 import {colors} from '../../theme/colors';
@@ -40,31 +40,49 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNorthStarModal, setShowNorthStarModal] = useState(false);
+  const [hasShownNorthStarModal, setHasShownNorthStarModal] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false); // For future dark mode toggle
 
-  // Check for daily North Star on mount and category change
+  // Check for daily North Star on mount only
   useEffect(() => {
     let mounted = true;
 
     const checkNorthStar = async () => {
-      if (!mounted) return;
+      if (!mounted || hasShownNorthStarModal) return;
 
       try {
+        console.log('Checking for Daily North Star...');
         const northStar = await intentionService.getDailyNorthStar();
         if (!northStar) {
+          console.log('No Daily North Star found, showing modal');
           setShowNorthStarModal(true);
+        } else {
+          console.log('Daily North Star found:', northStar.title);
         }
+        setHasShownNorthStarModal(true);
       } catch (error) {
         console.error('Error checking North Star:', error);
+        setHasShownNorthStarModal(true); // Prevent repeated attempts on error
       }
     };
+
+    checkNorthStar();
+
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array means it only runs on mount
+
+  // Separate useEffect for loading tasks when category changes
+  useEffect(() => {
+    let mounted = true;
 
     const loadTasksIfMounted = async () => {
       if (!mounted) return;
       await loadTasks();
     };
 
-    checkNorthStar();
     loadTasksIfMounted();
 
     return () => {
@@ -79,41 +97,47 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
     setError(null);
 
     try {
-      // Load tasks for all categories
-      const [todayTasks, nextTasks, laterTasks] = await Promise.all([
-        taskService.getTasksByCategory(TaskCategory.TODAY),
-        taskService.getTasksByCategory(TaskCategory.NEXT),
-        taskService.getTasksByCategory(TaskCategory.LATER),
-      ]);
+      console.log('TodoListScreen: Loading tasks...');
+      // Use the new categorizeTasks method
+      const {today, upcoming, someday} = await taskService.categorizeTasks();
+      console.log('TodoListScreen: Tasks loaded successfully');
+      console.log(
+        `TodoListScreen: Today: ${today.length}, Upcoming: ${upcoming.length}, Someday: ${someday.length}`,
+      );
 
       // Create sections based on selected category
       const sections: TaskSection[] = [];
 
       if (selectedCategory === TaskCategory.TODAY) {
+        console.log('TodoListScreen: Creating TODAY section');
         sections.push({
           title: 'TODAY',
-          data: todayTasks,
+          data: today,
           category: TaskCategory.TODAY,
         });
-      } else if (selectedCategory === TaskCategory.NEXT) {
+      } else if (selectedCategory === TaskCategory.UPCOMING) {
+        console.log('TodoListScreen: Creating UPCOMING section');
         sections.push({
-          title: 'NEXT',
-          data: nextTasks,
-          category: TaskCategory.NEXT,
+          title: 'UPCOMING',
+          data: upcoming,
+          category: TaskCategory.UPCOMING,
         });
-      } else if (selectedCategory === TaskCategory.LATER) {
+      } else if (selectedCategory === TaskCategory.SOMEDAY) {
+        console.log('TodoListScreen: Creating SOMEDAY section');
         sections.push({
-          title: 'LATER',
-          data: laterTasks,
-          category: TaskCategory.LATER,
+          title: 'SOMEDAY',
+          data: someday,
+          category: TaskCategory.SOMEDAY,
         });
       }
 
+      console.log(`TodoListScreen: Setting ${sections.length} task sections`);
       setTaskSections(sections);
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      console.error('TodoListScreen: Error loading tasks:', error);
       setError('Failed to load tasks. Please try again.');
     } finally {
+      console.log('TodoListScreen: Finished loading tasks');
       setLoading(false);
     }
   };
@@ -165,23 +189,50 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDarkMode
+            ? colors.darkMode.background
+            : colors.background,
+        },
+      ]}>
       <DailyNorthStarModal
         visible={showNorthStarModal}
         onComplete={() => {
           setShowNorthStarModal(false);
+          setHasShownNorthStarModal(true); // Mark as shown
           loadTasks();
         }}
       />
 
       {/* Header with Profile Button */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            borderBottomColor: isDarkMode
+              ? colors.darkMode.border.default
+              : colors.border.default,
+          },
+        ]}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Tasks</Text>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: isDarkMode
+                  ? colors.darkMode.text.primary
+                  : colors.text.primary,
+              },
+            ]}>
+            Tasks
+          </Text>
           <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}>
-            <Text style={styles.profileButtonText}>Profile</Text>
+            style={[styles.profileButton, {backgroundColor: colors.header}]}
+            onPress={() => navigation.navigate('TaskDetails', {taskId: 'new'})}>
+            <Text style={styles.profileButtonText}>+ New</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -195,8 +246,10 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
         <Switch
           value={showCalendar}
           onValueChange={setShowCalendar}
-          trackColor={{false: colors.surface, true: colors.primary}}
-          thumbColor={colors.text.primary}
+          trackColor={{false: colors.surface, true: colors.header}}
+          thumbColor={
+            isDarkMode ? colors.darkMode.text.primary : colors.text.primary
+          }
         />
       </View>
 
@@ -204,7 +257,15 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
       {showCalendar && <CalendarEvents />}
 
       {/* Category Tabs */}
-      <View style={styles.categoryTabs}>
+      <View
+        style={[
+          styles.categoryTabs,
+          {
+            borderBottomColor: isDarkMode
+              ? colors.darkMode.border.default
+              : colors.border.default,
+          },
+        ]}>
         {Object.values(TaskCategory).map(category => (
           <React.Fragment key={category}>
             {renderCategoryTab(category)}
@@ -220,7 +281,7 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.header} />
         </View>
       ) : (
         <SectionList
@@ -253,7 +314,7 @@ export const TodoListScreen: React.FC<Props> = ({navigation}) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.primary}
+              tintColor={colors.header}
             />
           }
           stickySectionHeadersEnabled={true}
@@ -267,10 +328,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    padding: 20, // Add more white space
   },
   header: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+    marginHorizontal: -20, // Compensate for container padding
+    paddingHorizontal: 20,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -282,13 +346,15 @@ const styles = StyleSheet.create({
     fontSize: spacing.xxl,
     fontWeight: 'bold',
     color: colors.text.primary,
+    fontFamily: 'System', // Use system font (Inter would be ideal if available)
   },
   categoryTabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.container.padding,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+    marginHorizontal: -20, // Compensate for container padding
+    paddingHorizontal: spacing.container.padding,
   },
   categoryTab: {
     paddingVertical: spacing.sm,
@@ -296,9 +362,14 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
     borderRadius: spacing.borderRadius.lg,
     backgroundColor: colors.surface,
+    elevation: 1, // Add subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   categoryTabSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
   },
   categoryText: {
     color: colors.text.secondary,
@@ -317,6 +388,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.container.padding,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+    marginHorizontal: -20, // Compensate for container padding
   },
   sectionHeaderText: {
     color: colors.text.secondary,
@@ -358,7 +430,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.borderRadius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
   },
   profileButtonText: {
     color: colors.text.primary,
@@ -369,10 +441,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.container.padding,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
+    marginHorizontal: -20, // Compensate for container padding
+    paddingHorizontal: spacing.container.padding,
   },
   calendarToggleText: {
     color: colors.text.primary,

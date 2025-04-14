@@ -11,11 +11,17 @@ import {
 } from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../../App';
-import {Task, TaskStatus} from '../../models/Task';
+import {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskCategory,
+  SubTask,
+} from '../../models/Task';
 import {taskService} from '../../services/task/TaskService';
 import {colors} from '../../theme/colors';
 import {spacing} from '../../theme/spacing';
-import {SubtaskList, Subtask} from '../../components/task/SubtaskList';
+// Import components
 import {SubtaskProgress} from '../../components/task/SubtaskProgress';
 import {SwipeableTask} from '../../components/task/SwipeableTask';
 
@@ -46,6 +52,27 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
 
   const loadTask = async () => {
     try {
+      // Special handling for "new" taskId
+      if (taskId === 'new') {
+        // Create a new empty task template
+        const now = new Date().toISOString();
+        setTask({
+          id: 'new', // Will be replaced with a real ID when saved
+          title: '',
+          description: '',
+          status: TaskStatus.TODO,
+          priority: TaskPriority.MEDIUM,
+          category: TaskCategory.TODAY,
+          subtasks: [],
+          tags: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Normal case - load existing task
       const loadedTask = await taskService.getTask(taskId);
       if (!loadedTask) {
         throw new Error('Task not found');
@@ -94,51 +121,15 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       setAddingSubtask(false);
     }
   };
-  const handleCompleteSubtask = async (
-    subtaskId: string,
-    completed: boolean,
-  ) => {
-    try {
-      if (completed) {
-        await taskService.completeSubtask(subtaskId);
-      } else {
-        await taskService.uncompleteSubtask(subtaskId);
-      }
-      // Reload task to show updated subtask status
-      await loadTask();
-    } catch (err) {
-      console.error('Error updating subtask:', err);
-      Alert.alert('Error', 'Failed to update subtask');
-    }
-  };
 
-  const handleUpdateSubtasks = async (subtasks: Subtask[]) => {
-    try {
-      if (!task) return;
+  // Removed handleCompleteSubtask function as it's no longer needed
 
-      // Convert to the format expected by the task service
-      const updatedSubtasks = subtasks.map(subtask => ({
-        id: subtask.id,
-        parentId: task.id,
-        title: subtask.title,
-        status: subtask.completed ? TaskStatus.COMPLETED : TaskStatus.TODO,
-        estimatedMinutes: subtask.estimatedMinutes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
-
-      await taskService.updateSubtasks(task.id, updatedSubtasks);
-      await loadTask();
-    } catch (err) {
-      console.error('Error updating subtasks:', err);
-      Alert.alert('Error', 'Failed to update subtasks');
-    }
-  };
+  // Removed handleUpdateSubtasks function as it's no longer needed
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.header} />
       </View>
     );
   }
@@ -151,17 +142,7 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
     );
   }
 
-  // Convert task subtasks to the format expected by SubtaskList
-  const convertSubtasks = (): Subtask[] => {
-    if (!task) return [];
-
-    return task.subtasks.map(subtask => ({
-      id: subtask.id,
-      title: subtask.title,
-      completed: subtask.status === TaskStatus.COMPLETED,
-      estimatedMinutes: subtask.estimatedMinutes || 15,
-    }));
-  };
+  // Removed convertSubtasks function as it's no longer needed
 
   return (
     <ScrollView style={styles.container}>
@@ -221,7 +202,10 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       {/* Progress Section */}
       <View style={styles.section}>
         <Text style={styles.label}>Progress</Text>
-        <SubtaskProgress subtasks={convertSubtasks()} />
+        <Text style={styles.description}>
+          {task.subtasks.filter(s => s.status === TaskStatus.COMPLETED).length}{' '}
+          of {task.subtasks.length} subtasks completed
+        </Text>
       </View>
 
       {/* Notes Section */}
@@ -235,11 +219,11 @@ export const TaskDetailsScreen: React.FC<Props> = ({route, navigation}) => {
       {/* Subtasks Section */}
       <View style={styles.section}>
         <Text style={styles.label}>Subtasks</Text>
-        <SubtaskList
-          subtasks={convertSubtasks()}
-          onSubtasksChange={handleUpdateSubtasks}
-          onSubtaskComplete={handleCompleteSubtask}
-        />
+        <Text style={styles.description}>
+          {task.subtasks.length > 0
+            ? `${task.subtasks.length} subtasks available`
+            : 'No subtasks available'}
+        </Text>
       </View>
 
       {/* Action Buttons */}
@@ -322,7 +306,7 @@ const styles = StyleSheet.create({
     fontSize: spacing.md,
   },
   northStar: {
-    color: colors.primary,
+    color: colors.northStar,
     fontWeight: 'bold',
   },
   timeEstimate: {
@@ -352,7 +336,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   completedStatus: {
-    color: colors.primary,
+    color: colors.status.success,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -373,7 +357,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     borderRadius: spacing.borderRadius.sm,
   },
   progressText: {
@@ -391,8 +375,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subtaskCheckboxCompleted: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.header,
+    borderColor: colors.header,
   },
   checkmark: {
     color: colors.text.primary,
@@ -422,7 +406,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   addSubtaskButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     borderRadius: spacing.borderRadius.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
@@ -448,7 +432,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.timer.focus.background,
   },
   completeButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
   },
   buttonText: {
     color: colors.text.primary,

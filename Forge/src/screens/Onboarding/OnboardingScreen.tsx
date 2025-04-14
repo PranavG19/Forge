@@ -149,6 +149,9 @@ export const OnboardingScreen: React.FC<Props> = ({navigation}) => {
 
       // If app blocking is enabled, configure the blocked apps
       if (appBlockingEnabled) {
+        // Initialize the app blocking service first
+        await appBlockingService.initialize();
+
         const focusApps = focusBlockedApps.map(name => ({
           packageName:
             Platform.OS === 'ios'
@@ -179,7 +182,7 @@ export const OnboardingScreen: React.FC<Props> = ({navigation}) => {
       await settingsService.setOnboardingCompleted(true);
 
       // Navigate to the main app
-      navigation.replace('TodoList');
+      navigation.replace('MainTabs');
     } catch (err) {
       console.error('Error completing onboarding:', err);
       setError('Failed to complete setup');
@@ -327,7 +330,7 @@ export const OnboardingScreen: React.FC<Props> = ({navigation}) => {
         <Switch
           value={appBlockingEnabled}
           onValueChange={setAppBlockingEnabled}
-          trackColor={{false: colors.surface, true: colors.primary}}
+          trackColor={{false: colors.surface, true: colors.northStar}}
           thumbColor={colors.text.primary}
         />
       </View>
@@ -497,7 +500,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: spacing.xl,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.header,
   },
   step: {
     flex: 1,
@@ -525,7 +528,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   northStarInput: {
-    borderColor: colors.primary,
+    borderColor: colors.northStar,
   },
   button: {
     padding: spacing.md,
@@ -534,7 +537,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   northStarButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   buttonText: {
     color: colors.text.primary,
@@ -554,7 +557,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   northStarTagSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   northStarTagText: {
     fontSize: spacing.sm,
@@ -576,7 +579,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetDayButtonSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   resetDayText: {
     color: colors.text.secondary,
@@ -599,7 +602,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',
@@ -646,7 +649,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   appItemSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   appItemText: {
     color: colors.text.secondary,
@@ -670,7 +673,7 @@ const styles = StyleSheet.create({
     borderRadius: spacing.borderRadius.sm,
   },
   blockModeItemSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.northStar,
   },
   blockModeText: {
     color: colors.text.secondary,

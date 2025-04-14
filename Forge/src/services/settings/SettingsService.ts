@@ -41,7 +41,8 @@ export class SettingsService extends EventEmitter {
   private constructor() {
     super();
     this.settings = {...SettingsService.DEFAULT_SETTINGS};
-    this.initializeDatabase().catch(console.error);
+    // Don't initialize in constructor to avoid circular dependencies
+    // Initialization will happen on first use
   }
 
   static getInstance(): SettingsService {
@@ -52,32 +53,69 @@ export class SettingsService extends EventEmitter {
   }
 
   private async initializeDatabase(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {
+      console.log('Settings service already initialized');
+      return;
+    }
+
+    console.log('Initializing settings service...');
+
+    // Add a delay to ensure database service has time to initialize first
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
+      // Try to create the settings table
+      try {
+        console.log('Creating settings table if not exists...');
+        await databaseService.executeSql(`
+          CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+          )
+        `);
+      } catch (tableError) {
+        console.error('Error creating settings table:', tableError);
+        // Continue anyway - table might already exist
+      }
 
       // Initialize default settings if not set
-      const defaultSettings = SettingsService.DEFAULT_SETTINGS;
-      for (const [key, value] of Object.entries(defaultSettings)) {
-        await databaseService.executeSql(
-          `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`,
-          [key, JSON.stringify(value)],
-        );
+      try {
+        console.log('Initializing default settings...');
+        const defaultSettings = SettingsService.DEFAULT_SETTINGS;
+        for (const [key, value] of Object.entries(defaultSettings)) {
+          try {
+            await databaseService.executeSql(
+              `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`,
+              [key, JSON.stringify(value)],
+            );
+          } catch (settingError) {
+            console.error(
+              `Error setting default value for ${key}:`,
+              settingError,
+            );
+            // Continue with next setting
+          }
+        }
+      } catch (defaultsError) {
+        console.error('Error initializing default settings:', defaultsError);
+        // Continue anyway
       }
 
       // Load all settings from the database
-      await this.loadAllSettings();
+      try {
+        console.log('Loading settings from database...');
+        await this.loadAllSettings();
+      } catch (loadError) {
+        console.error('Error loading settings:', loadError);
+        // Continue with default settings in memory
+      }
 
       this.initialized = true;
+      console.log('Settings service initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize settings database:', error);
-      throw error;
+      console.error('Failed to initialize settings service:', error);
+      // Don't throw - use default settings from memory
+      this.initialized = true; // Mark as initialized anyway to prevent repeated attempts
     }
   }
 
@@ -89,12 +127,35 @@ export class SettingsService extends EventEmitter {
 
       for (let i = 0; i < result.rows.length; i++) {
         const row = result.rows.item(i);
-        const key = row.key as keyof AppSettings;
         try {
-          this.settings[key] = JSON.parse(row.value);
+          // Use a type-safe approach with a switch statement
+          switch (row.key) {
+            case 'onboardingCompleted':
+              this.settings.onboardingCompleted = JSON.parse(row.value);
+              break;
+            case 'soundEnabled':
+              this.settings.soundEnabled = JSON.parse(row.value);
+              break;
+            case 'hapticsEnabled':
+              this.settings.hapticsEnabled = JSON.parse(row.value);
+              break;
+            case 'weeklyResetDay':
+              this.settings.weeklyResetDay = JSON.parse(row.value);
+              break;
+            case 'focusTimerPresets':
+              this.settings.focusTimerPresets = JSON.parse(row.value);
+              break;
+            case 'restTimerPresets':
+              this.settings.restTimerPresets = JSON.parse(row.value);
+              break;
+            case 'lastResetDate':
+              this.settings.lastResetDate = JSON.parse(row.value);
+              break;
+            default:
+              console.warn(`Unknown setting key: ${row.key}`);
+          }
         } catch (e) {
-          console.error(`Failed to parse setting value for key ${key}:`, e);
-          this.settings[key] = row.value as any;
+          console.error(`Failed to parse setting value for key ${row.key}:`, e);
         }
       }
 

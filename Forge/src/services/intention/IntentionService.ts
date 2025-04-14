@@ -28,7 +28,8 @@ export class IntentionService extends EventEmitter {
 
   private constructor() {
     super();
-    this.initializeDatabase().catch(console.error);
+    // Don't initialize in constructor to avoid circular dependencies
+    // Initialization will happen on first use
   }
 
   static getInstance(): IntentionService {
@@ -39,59 +40,62 @@ export class IntentionService extends EventEmitter {
   }
 
   private async initializeDatabase(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {
+      console.log('Intention service already initialized');
+      return;
+    }
+
+    console.log('Initializing intention service...');
 
     try {
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS intentions (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          isNorthStar BOOLEAN NOT NULL,
-          type TEXT NOT NULL,
-          createdAt TEXT NOT NULL,
-          completedAt TEXT,
-          weekStartDate TEXT
-        )
-      `);
-
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
-
-      // Initialize weekly reset day if not set
-      const resetDay = await this.getWeeklyResetDay();
-      if (!resetDay) {
-        await this.setWeeklyResetDay('SUNDAY');
+      // We don't need to create tables here anymore since DatabaseService handles it
+      // Just initialize weekly reset day if not set
+      try {
+        console.log('Checking weekly reset day...');
+        const resetDay = await this.getWeeklyResetDay();
+        if (!resetDay) {
+          console.log('Setting default weekly reset day to SUNDAY');
+          await this.setWeeklyResetDay('SUNDAY');
+        }
+      } catch (resetDayError) {
+        console.error('Error setting weekly reset day:', resetDayError);
+        // Continue anyway
       }
 
       this.initialized = true;
+      console.log('Intention service initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize intention database:', error);
-      throw error;
+      console.error('Failed to initialize intention service:', error);
+      // Don't throw - mark as initialized anyway to prevent repeated attempts
+      this.initialized = true;
     }
   }
 
   async setDailyNorthStar(title: string): Promise<Intention> {
-    const now = new Date().toISOString();
-    const intention: Intention = {
-      id: uuidv4(),
-      title,
-      isNorthStar: true,
-      type: 'daily',
-      createdAt: now,
-    };
+    try {
+      console.log('IntentionService: Setting daily North Star:', title);
+      const now = new Date().toISOString();
+      const intention: Intention = {
+        id: uuidv4(),
+        title,
+        isNorthStar: true,
+        type: 'daily',
+        createdAt: now,
+      };
 
-    await databaseService.executeSql(
-      `INSERT INTO intentions (id, title, isNorthStar, type, createdAt)
-       VALUES (?, ?, ?, ?, ?)`,
-      [intention.id, intention.title, 1, intention.type, intention.createdAt],
-    );
+      await databaseService.executeSql(
+        `INSERT INTO intentions (id, title, isNorthStar, type, createdAt)
+         VALUES (?, ?, ?, ?, ?)`,
+        [intention.id, intention.title, 1, intention.type, intention.createdAt],
+      );
 
-    this.emit('dailyNorthStarSet', intention);
-    return intention;
+      console.log('IntentionService: Daily North Star set successfully');
+      this.emit('dailyNorthStarSet', intention);
+      return intention;
+    } catch (error) {
+      console.error('IntentionService: Error setting daily North Star:', error);
+      throw error; // Re-throw to allow UI to show error message
+    }
   }
 
   async setWeeklyIntentions(
@@ -146,18 +150,30 @@ export class IntentionService extends EventEmitter {
   }
 
   async getDailyNorthStar(): Promise<Intention | null> {
-    const today = new Date().toISOString().split('T')[0];
-    const [result] = await databaseService.executeSql(
-      `SELECT * FROM intentions 
-       WHERE type = 'daily' 
-       AND isNorthStar = 1 
-       AND date(createdAt) = ?
-       ORDER BY createdAt DESC 
-       LIMIT 1`,
-      [today],
-    );
+    try {
+      console.log('IntentionService: Getting daily North Star');
+      const today = new Date().toISOString().split('T')[0];
+      console.log('IntentionService: Today is', today);
 
-    return result.rows.length > 0 ? result.rows.item(0) : null;
+      // Simplify the query to avoid using date() function
+      const [result] = await databaseService.executeSql(
+        `SELECT * FROM intentions 
+         WHERE type = 'daily' 
+         AND isNorthStar = 1 
+         AND createdAt LIKE ?
+         ORDER BY createdAt DESC 
+         LIMIT 1`,
+        [`${today}%`], // Use LIKE with % wildcard to match the date part
+      );
+
+      const hasNorthStar = result.rows.length > 0;
+      console.log('IntentionService: North Star found?', hasNorthStar);
+
+      return hasNorthStar ? result.rows.item(0) : null;
+    } catch (error) {
+      console.error('IntentionService: Error getting daily North Star:', error);
+      return null; // Return null instead of throwing to prevent crashes
+    }
   }
 
   async getWeeklyIntentions(): Promise<Intention[]> {
@@ -187,41 +203,55 @@ export class IntentionService extends EventEmitter {
   }
 
   async getStats(): Promise<IntentionStats> {
-    const today = new Date().toISOString().split('T')[0];
-    const weekStartDate = this.getWeekStartDate(new Date()).toISOString();
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const weekStartDate = this.getWeekStartDate(new Date()).toISOString();
 
-    const [dailyResult] = await databaseService.executeSql(
-      `SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN completedAt IS NOT NULL THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN isNorthStar = 1 THEN 1 ELSE 0 END) as northStar
-       FROM intentions 
-       WHERE type = 'daily' AND date(createdAt) = ?`,
-      [today],
-    );
+      // Fix the query to avoid using date() function
+      const [dailyResult] = await databaseService.executeSql(
+        `SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN completedAt IS NOT NULL THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN isNorthStar = 1 THEN 1 ELSE 0 END) as northStar
+         FROM intentions 
+         WHERE type = 'daily' AND createdAt LIKE ?`,
+        [`${today}%`],
+      );
 
-    const [weeklyResult] = await databaseService.executeSql(
-      `SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN completedAt IS NOT NULL THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN isNorthStar = 1 THEN 1 ELSE 0 END) as northStar
-       FROM intentions 
-       WHERE type = 'weekly' AND weekStartDate = ?`,
-      [weekStartDate],
-    );
+      const [weeklyResult] = await databaseService.executeSql(
+        `SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN completedAt IS NOT NULL THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN isNorthStar = 1 THEN 1 ELSE 0 END) as northStar
+         FROM intentions 
+         WHERE type = 'weekly' AND weekStartDate = ?`,
+        [weekStartDate],
+      );
 
-    const daily = dailyResult.rows.item(0);
-    const weekly = weeklyResult.rows.item(0);
+      const daily = dailyResult.rows.item(0);
+      const weekly = weeklyResult.rows.item(0);
 
-    return {
-      dailyNorthStarSet: daily.northStar > 0,
-      weeklyIntentionsSet: weekly.total === 3,
-      weeklyNorthStarSet: weekly.northStar > 0,
-      completedDailyCount: daily.completed,
-      completedWeeklyCount: weekly.completed,
-      totalDailyCount: daily.total,
-      totalWeeklyCount: weekly.total,
-    };
+      return {
+        dailyNorthStarSet: daily.northStar > 0,
+        weeklyIntentionsSet: weekly.total === 3,
+        weeklyNorthStarSet: weekly.northStar > 0,
+        completedDailyCount: daily.completed,
+        completedWeeklyCount: weekly.completed,
+        totalDailyCount: daily.total,
+        totalWeeklyCount: weekly.total,
+      };
+    } catch (error) {
+      console.error('Error getting intention stats:', error);
+      return {
+        dailyNorthStarSet: false,
+        weeklyIntentionsSet: false,
+        weeklyNorthStarSet: false,
+        completedDailyCount: 0,
+        completedWeeklyCount: 0,
+        totalDailyCount: 0,
+        totalWeeklyCount: 0,
+      };
+    }
   }
 
   async setWeeklyResetDay(day: string): Promise<void> {
@@ -232,11 +262,16 @@ export class IntentionService extends EventEmitter {
   }
 
   async getWeeklyResetDay(): Promise<string> {
-    const [result] = await databaseService.executeSql(
-      `SELECT value FROM settings WHERE key = ?`,
-      ['weeklyResetDay'],
-    );
-    return result.rows.length > 0 ? result.rows.item(0).value : 'SUNDAY';
+    try {
+      const [result] = await databaseService.executeSql(
+        `SELECT value FROM settings WHERE key = ?`,
+        ['weeklyResetDay'],
+      );
+      return result.rows.length > 0 ? result.rows.item(0).value : 'SUNDAY';
+    } catch (error) {
+      console.error('Error getting weekly reset day:', error);
+      return 'SUNDAY'; // Default to Sunday on error
+    }
   }
 
   private getWeekStartDate(date: Date): Date {

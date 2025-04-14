@@ -2,12 +2,15 @@ import 'react-native-get-random-values';
 import React, {useEffect, useState} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {ActivityIndicator, View, Text, StyleSheet} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import {TodoListScreen} from './src/screens/TodoList/TodoListScreen';
 import {TaskDetailsScreen} from './src/screens/TaskDetails/TaskDetailsScreen';
 import {TimerScreen} from './src/screens/Timer/TimerScreen';
 import {OnboardingScreen} from './src/screens/Onboarding/OnboardingScreen';
 import {ProfileScreen} from './src/screens/Profile/ProfileScreen';
+import {ProjectsScreen} from './src/screens/Projects/ProjectsScreen';
 import {colors} from './src/theme/colors';
 import {databaseService} from './src/services/storage/DatabaseService';
 import {settingsService} from './src/services/settings/SettingsService';
@@ -18,10 +21,62 @@ import WeeklyResetModal from './src/components/modals/WeeklyResetModal';
 
 export type RootStackParamList = {
   Onboarding: undefined;
+  MainTabs: undefined;
   TodoList: undefined;
+  Projects: undefined;
   TaskDetails: {taskId: string};
   Timer: {taskId: string};
   Profile: undefined;
+};
+
+// Create bottom tab navigator
+const Tab = createBottomTabNavigator();
+
+// Main tab navigator component
+const MainTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: colors.header,
+        tabBarInactiveTintColor: colors.text.secondary,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border.default,
+        },
+        headerShown: false,
+      }}>
+      <Tab.Screen
+        name="TodoList"
+        component={TodoListScreen as React.ComponentType<any>}
+        options={{
+          tabBarLabel: 'Tasks',
+          tabBarIcon: ({color, size}: {color: string; size: number}) => (
+            <Icon name="check-circle" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Projects"
+        component={ProjectsScreen as React.ComponentType<any>}
+        options={{
+          tabBarLabel: 'Projects',
+          tabBarIcon: ({color, size}: {color: string; size: number}) => (
+            <Icon name="folder" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen as React.ComponentType<any>}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({color, size}: {color: string; size: number}) => (
+            <Icon name="person" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,28 +92,73 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        await databaseService.initDatabase();
-        const onboardingCompleted =
-          await settingsService.isOnboardingCompleted();
-        setInitialRoute(onboardingCompleted ? 'TodoList' : 'Onboarding');
+        console.log('App initialization started');
+
+        // Initialize database with a timeout to prevent hanging
+        const dbInitPromise = databaseService.initDatabase();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Database initialization timed out')),
+            5000,
+          ),
+        );
+
+        try {
+          await Promise.race([dbInitPromise, timeoutPromise]);
+          console.log('Database initialized successfully');
+        } catch (dbError) {
+          console.error(
+            'Database initialization failed or timed out:',
+            dbError,
+          );
+          // Continue anyway - we'll try to work with what we have
+        }
+
+        console.log('Checking onboarding status');
+        let onboardingCompleted = false;
+        try {
+          onboardingCompleted = await settingsService.isOnboardingCompleted();
+          console.log('Onboarding completed:', onboardingCompleted);
+        } catch (settingsError) {
+          console.error('Failed to check onboarding status:', settingsError);
+          // Default to onboarding if we can't determine status
+        }
+
+        setInitialRoute(onboardingCompleted ? 'MainTabs' : 'Onboarding');
 
         // Check for weekly reset
         if (onboardingCompleted) {
-          // Use our new WeeklyResetService instead
-          const shouldReset = await weeklyResetService.checkForReset();
-          if (shouldReset) {
-            setShowWeeklyResetModal(true);
+          console.log('Checking for weekly reset');
+          try {
+            // Use our new WeeklyResetService instead
+            const shouldReset = await weeklyResetService.checkForReset();
+            if (shouldReset) {
+              setShowWeeklyResetModal(true);
+            }
+          } catch (resetError) {
+            console.error('Failed to check weekly reset:', resetError);
+            // Continue without showing reset modal
           }
         }
 
         // Track app open and check retention
-        await analyticsService.logAppOpen();
-        await analyticsService.logRetention();
+        try {
+          console.log('Logging app open and retention');
+          await analyticsService.logAppOpen();
+          await analyticsService.logRetention();
+        } catch (analyticsError) {
+          console.error('Failed to log analytics:', analyticsError);
+          // Continue without analytics
+        }
 
+        console.log('App initialization completed');
         setIsLoading(false);
       } catch (err) {
-        console.error('Failed to initialize database:', err);
-        setError('Failed to initialize app');
+        console.error('Failed to initialize app:', err);
+        setError(
+          'Failed to initialize app: ' +
+            (err instanceof Error ? err.message : String(err)),
+        );
         setIsLoading(false);
       }
     };
@@ -69,7 +169,7 @@ const App = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.header} />
       </View>
     );
   }
@@ -105,8 +205,8 @@ const App = () => {
           options={{headerShown: false}}
         />
         <Stack.Screen
-          name="TodoList"
-          component={TodoListScreen}
+          name="MainTabs"
+          component={MainTabNavigator}
           options={{headerShown: false}}
         />
         <Stack.Screen
@@ -127,18 +227,6 @@ const App = () => {
           options={{
             headerShown: true,
             headerTitle: 'Task Details',
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
-            headerTintColor: colors.text.primary,
-          }}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            headerShown: true,
-            headerTitle: 'Profile',
             headerStyle: {
               backgroundColor: colors.background,
             },

@@ -232,13 +232,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: colors.header,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
   },
   checkmark: {
     color: '#000',
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     borderRadius: 4,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,

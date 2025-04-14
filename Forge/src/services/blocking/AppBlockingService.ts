@@ -18,7 +18,7 @@ export class AppBlockingService extends EventEmitter {
 
   private constructor() {
     super();
-    this.initializeDatabase().catch(console.error);
+    // Don't initialize database here - wait for explicit initialization
   }
 
   static getInstance(): AppBlockingService {
@@ -26,6 +26,12 @@ export class AppBlockingService extends EventEmitter {
       AppBlockingService.instance = new AppBlockingService();
     }
     return AppBlockingService.instance;
+  }
+
+  async initialize(): Promise<void> {
+    if (!this.initialized) {
+      await this.initializeDatabase();
+    }
   }
 
   private async initializeDatabase(): Promise<void> {
@@ -114,32 +120,47 @@ export class AppBlockingService extends EventEmitter {
   }
 
   async setBlockedApps(apps: BlockedApp[], isForFocus: boolean): Promise<void> {
-    // Clear existing apps
-    await databaseService.executeSql(
-      'DELETE FROM blocked_apps WHERE isForFocus = ?',
-      [isForFocus ? 1 : 0],
-    );
+    try {
+      // Ensure database is initialized
+      if (!this.initialized) {
+        await this.initialize();
+      }
 
-    // Insert new apps
-    for (const app of apps) {
+      // Clear existing apps
       await databaseService.executeSql(
-        `INSERT INTO blocked_apps (packageName, name, mode, timerDuration, isForFocus)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          app.packageName,
-          app.name,
-          app.mode,
-          app.timerDuration || null,
-          isForFocus ? 1 : 0,
-        ],
+        'DELETE FROM blocked_apps WHERE isForFocus = ?',
+        [isForFocus ? 1 : 0],
       );
-    }
 
-    await this.loadBlockedApps();
-    this.emit('blockedAppsChanged');
+      // Insert new apps
+      for (const app of apps) {
+        await databaseService.executeSql(
+          `INSERT INTO blocked_apps (packageName, name, mode, timerDuration, isForFocus)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            app.packageName,
+            app.name,
+            app.mode,
+            app.timerDuration || null,
+            isForFocus ? 1 : 0,
+          ],
+        );
+      }
+
+      await this.loadBlockedApps();
+      this.emit('blockedAppsChanged');
+    } catch (error) {
+      console.error('Error setting blocked apps:', error);
+      throw error;
+    }
   }
 
   async logBreach(packageName: string, mode: 'FOCUS' | 'REST'): Promise<void> {
+    // Ensure database is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
     await databaseService.executeSql(
       `INSERT INTO breach_logs (id, packageName, timestamp, mode)
        VALUES (?, ?, ?, ?)`,
@@ -149,6 +170,11 @@ export class AppBlockingService extends EventEmitter {
   }
 
   async getBreachCount(since: Date): Promise<number> {
+    // Ensure database is initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
     const [result] = await databaseService.executeSql(
       `SELECT COUNT(*) as count FROM breach_logs
        WHERE timestamp >= ?`,

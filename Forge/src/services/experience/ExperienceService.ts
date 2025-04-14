@@ -31,7 +31,8 @@ export class ExperienceService extends EventEmitter {
 
   private constructor() {
     super();
-    this.initializeDatabase().catch(console.error);
+    // Don't initialize in constructor to avoid circular dependencies
+    // Initialization will happen on first use
   }
 
   static getInstance(): ExperienceService {
@@ -42,55 +43,92 @@ export class ExperienceService extends EventEmitter {
   }
 
   private async initializeDatabase(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {
+      console.log('Experience service already initialized');
+      return;
+    }
+
+    console.log('Initializing experience service...');
+
+    // Add a delay to ensure database service has time to initialize first
+    await new Promise(resolve => setTimeout(resolve, 700));
 
     try {
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS experience_logs (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          value INTEGER NOT NULL,
-          timestamp TEXT NOT NULL
-        )
-      `);
+      // Try to create the experience_logs table
+      try {
+        console.log('Creating experience_logs table if not exists...');
+        await databaseService.executeSql(`
+          CREATE TABLE IF NOT EXISTS experience_logs (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            value INTEGER NOT NULL,
+            timestamp TEXT NOT NULL
+          )
+        `);
+      } catch (logsTableError) {
+        console.error('Error creating experience_logs table:', logsTableError);
+        // Continue anyway - table might already exist
+      }
 
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS time_logs (
-          id TEXT PRIMARY KEY,
-          mode TEXT NOT NULL,
-          duration INTEGER NOT NULL,
-          timestamp TEXT NOT NULL
-        )
-      `);
+      // Try to create the time_logs table
+      try {
+        console.log('Creating time_logs table if not exists...');
+        await databaseService.executeSql(`
+          CREATE TABLE IF NOT EXISTS time_logs (
+            id TEXT PRIMARY KEY,
+            mode TEXT NOT NULL,
+            duration INTEGER NOT NULL,
+            timestamp TEXT NOT NULL
+          )
+        `);
+      } catch (timeLogsTableError) {
+        console.error('Error creating time_logs table:', timeLogsTableError);
+        // Continue anyway - table might already exist
+      }
 
-      // Create the main experience table to track total and weekly experience
-      await databaseService.executeSql(`
-        CREATE TABLE IF NOT EXISTS experience (
-          id INTEGER PRIMARY KEY,
-          totalExp INTEGER NOT NULL DEFAULT 0,
-          weeklyExp INTEGER NOT NULL DEFAULT 0,
-          lastResetDate TEXT NOT NULL
-        )
-      `);
+      // Try to create the main experience table
+      try {
+        console.log('Creating experience table if not exists...');
+        await databaseService.executeSql(`
+          CREATE TABLE IF NOT EXISTS experience (
+            id INTEGER PRIMARY KEY,
+            totalExp INTEGER NOT NULL DEFAULT 0,
+            weeklyExp INTEGER NOT NULL DEFAULT 0,
+            lastResetDate TEXT NOT NULL
+          )
+        `);
+      } catch (expTableError) {
+        console.error('Error creating experience table:', expTableError);
+        // Continue anyway - table might already exist
+      }
 
       // Check if we need to initialize the experience record
-      const [result] = await databaseService.executeSql(
-        'SELECT COUNT(*) as count FROM experience',
-      );
-
-      if (result.rows.item(0).count === 0) {
-        // Initialize with default values
-        await databaseService.executeSql(
-          `INSERT INTO experience (id, totalExp, weeklyExp, lastResetDate)
-           VALUES (?, ?, ?, ?)`,
-          [1, 0, 0, new Date().toISOString()],
+      try {
+        console.log('Checking if experience record needs initialization...');
+        const [result] = await databaseService.executeSql(
+          'SELECT COUNT(*) as count FROM experience',
         );
+
+        if (result.rows.item(0).count === 0) {
+          console.log('Initializing experience record with default values');
+          // Initialize with default values
+          await databaseService.executeSql(
+            `INSERT INTO experience (id, totalExp, weeklyExp, lastResetDate)
+             VALUES (?, ?, ?, ?)`,
+            [1, 0, 0, new Date().toISOString()],
+          );
+        }
+      } catch (initRecordError) {
+        console.error('Error initializing experience record:', initRecordError);
+        // Continue anyway
       }
 
       this.initialized = true;
+      console.log('Experience service initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize experience database:', error);
-      throw error;
+      console.error('Failed to initialize experience service:', error);
+      // Don't throw - mark as initialized anyway to prevent repeated attempts
+      this.initialized = true;
     }
   }
 

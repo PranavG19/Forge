@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   actionText: {
-    color: colors.primary,
+    color: colors.header,
     fontWeight: 'bold',
     fontSize: 16,
   },

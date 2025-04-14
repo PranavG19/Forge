@@ -1,49 +1,64 @@
 export const colors = {
-  // Base colors
-  background: '#000000',
-  surface: '#1E1E1E',
+  // Base colors - Light mode (Things3-inspired)
+  background: '#F5F5F5',
+  surface: '#FFFFFF',
 
   // Primary colors
-  primary: '#FF6200', // Orange for North Star tasks and highlights
-  primaryDark: '#CC4E00',
-  primaryLight: '#FF7A33',
+  header: '#4A90E2', // Blue for headers and accents
+  northStar: '#50C878', // Green for North Star tasks
+  overdue: '#FF4444', // Red for overdue tasks
 
   // Text colors
   text: {
-    primary: '#FFFFFF',
+    primary: '#333333',
     secondary: '#666666',
-    disabled: '#444444',
+    disabled: '#AAAAAA',
   },
 
   // Border colors
   border: {
-    default: '#333333',
-    focused: '#FF6B00',
+    default: '#E0E0E0',
+    focused: '#4A90E2',
   },
 
   // Status colors
   status: {
-    success: '#4CAF50',
-    error: '#F44336',
+    success: '#50C878',
+    error: '#FF4444',
     warning: '#FFC107',
   },
 
   // Task category colors
   category: {
-    today: '#FF6B00',
-    next: '#666666',
-    later: '#444444',
+    today: '#4A90E2',
+    upcoming: '#50C878',
+    someday: '#666666',
   },
 
   // Timer mode colors
   timer: {
     focus: {
-      background: '#FF0000', // Red fire background
+      background: '#FF6B6B', // Softer red fire background
       text: '#FFFFFF',
     },
     rest: {
-      background: '#00B7EB', // Blue water background
+      background: '#6BB5FF', // Softer blue water background
       text: '#FFFFFF',
+    },
+  },
+
+  // Dark mode variants (for future toggle)
+  darkMode: {
+    background: '#1C2526',
+    surface: '#2D3748',
+    text: {
+      primary: '#FFFFFF',
+      secondary: '#A0AEC0',
+      disabled: '#718096',
+    },
+    border: {
+      default: '#4A5568',
+      focused: '#63B3ED',
     },
   },
 };
@@ -55,7 +70,8 @@ export const opacity = {
 };
 
 export const gradients = {
-  primary: ['#FF6200', '#FF7A33'],
-  focus: ['#FF0000', '#CC0000'],
-  rest: ['#00B7EB', '#0091BC'],
+  header: ['#4A90E2', '#63B3ED'],
+  northStar: ['#50C878', '#7DCEA0'],
+  focus: ['#FF6B6B', '#FF8F8F'],
+  rest: ['#6BB5FF', '#90CAF9'],
 };

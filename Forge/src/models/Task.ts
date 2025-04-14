@@ -13,8 +13,8 @@ export enum TaskStatus {
 
 export enum TaskCategory {
   TODAY = 'TODAY',
-  NEXT = 'NEXT',
-  LATER = 'LATER',
+  UPCOMING = 'UPCOMING',
+  SOMEDAY = 'SOMEDAY',
 }
 
 export interface SubTask {
@@ -22,7 +22,17 @@ export interface SubTask {
   parentId: string;
   title: string;
   status: TaskStatus;
+  checked: boolean; // For checklist functionality
   estimatedMinutes?: number; // in minutes
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description?: string;
+  isNorthStar: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +44,11 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   category: TaskCategory;
+  projectId?: string; // Link to project
+  tags: string[]; // For quick find/filtering
+  dueDate?: string; // For calendar integration
+  dueTime?: string; // For time-based reminders
+  reminder?: string; // For notifications
   timeEstimate?: number; // in minutes
   subtasks: SubTask[];
   notes?: string;

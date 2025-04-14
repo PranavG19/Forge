@@ -11,7 +11,7 @@ import {
   PanResponder,
   Dimensions,
 } from 'react-native';
-import {Task, TaskStatus, TaskPriority} from '../../models/Task';
+import {Task, TaskStatus, TaskPriority, SubTask} from '../../models/Task';
 import {colors} from '../../theme/colors';
 import {spacing} from '../../theme/spacing';
 
@@ -89,10 +89,35 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
 
     const completedSubtasks = task.subtasks.filter(
-      subtask => subtask.status === TaskStatus.COMPLETED,
+      subtask => subtask.checked,
     ).length;
 
     return Math.round((completedSubtasks / task.subtasks.length) * 100);
+  };
+
+  // Format due date for display
+  const formatDueDate = () => {
+    if (!task.dueDate) return null;
+
+    const date = new Date(task.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today' + (task.dueTime ? ` at ${task.dueTime}` : '');
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow' + (task.dueTime ? ` at ${task.dueTime}` : '');
+    } else {
+      return (
+        date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }) + (task.dueTime ? ` at ${task.dueTime}` : '')
+      );
+    }
   };
   return (
     <Animated.View
@@ -105,6 +130,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           styles.container,
           task.priority === TaskPriority.NORTH_STAR &&
             styles.northStarContainer,
+          task.dueDate &&
+            new Date(task.dueDate) < new Date() &&
+            styles.overdueContainer,
         ]}
         onPress={() => onPress(task)}
         activeOpacity={0.7}>
@@ -138,6 +166,33 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </View>
 
+        {/* Due date display */}
+        {task.dueDate && (
+          <View style={styles.dueDateContainer}>
+            <Text
+              style={[
+                styles.dueDate,
+                new Date(task.dueDate) < new Date() && styles.overdue,
+              ]}>
+              {formatDueDate()}
+            </Text>
+          </View>
+        )}
+
+        {/* Tags display */}
+        {task.tags && task.tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {task.tags.slice(0, 3).map((tag, index) => (
+              <View key={index} style={styles.tag}>
+                <Text style={styles.tagText}>#{tag}</Text>
+              </View>
+            ))}
+            {task.tags.length > 3 && (
+              <Text style={styles.moreTagsText}>+{task.tags.length - 3}</Text>
+            )}
+          </View>
+        )}
+
         {task.subtasks.length > 0 && (
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
@@ -165,9 +220,19 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.task.marginHorizontal,
     borderWidth: 1,
     borderColor: colors.border.default,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   northStarContainer: {
-    borderColor: colors.primary,
+    borderColor: colors.northStar,
+    borderLeftWidth: 4,
+  },
+  overdueContainer: {
+    borderColor: colors.overdue,
+    borderLeftWidth: 4,
   },
   header: {
     flexDirection: 'row',
@@ -188,10 +253,11 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.surface,
   },
   checkboxCompleted: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.header,
+    borderColor: colors.header,
   },
   checkmark: {
     color: colors.text.primary,
@@ -211,7 +277,7 @@ const styles = StyleSheet.create({
     width: spacing.icon.lg,
     height: spacing.icon.lg,
     borderRadius: spacing.icon.lg / 2,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
@@ -238,12 +304,45 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     borderRadius: spacing.borderRadius.sm,
   },
   progressText: {
     color: colors.text.secondary,
     fontSize: spacing.sm + spacing.xs,
     minWidth: spacing.xl,
+  },
+  dueDateContainer: {
+    marginTop: spacing.xs,
+  },
+  dueDate: {
+    fontSize: spacing.sm,
+    color: colors.text.secondary,
+  },
+  overdue: {
+    color: colors.overdue,
+    fontWeight: 'bold',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: spacing.xs,
+  },
+  tag: {
+    backgroundColor: colors.background,
+    borderRadius: spacing.borderRadius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    marginRight: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  tagText: {
+    fontSize: spacing.sm - 2,
+    color: colors.header,
+  },
+  moreTagsText: {
+    fontSize: spacing.sm - 2,
+    color: colors.text.secondary,
+    alignSelf: 'center',
   },
 });

@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   percentage: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.header,
   },
   progressBarContainer: {
     height: 8,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.header,
     borderRadius: 4,
   },
   statsContainer: {
